@@ -28,7 +28,8 @@ jobs:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: eas init --non-interactive --force
 
-      - name: Trigger EAS build
+      - : Trigger EAS build
         working-directory: veltex-app
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+run: eas build --platform android --profile preview --non-interactive
