@@ -1,6 +1,5 @@
-name: Build VELTEX Android Appname: Build VELTEX Android App
+name: Build VELTEX Android App
 
-# Run this manually from the GitHub Actions tab — no terminal needed.
 on:
   workflow_dispatch:
 
@@ -33,39 +32,3 @@ jobs:
         working-directory: veltex-app
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: eas build --platform android --profile preview --non-interactive
-
-# Run this manually from the GitHub Actions tab — no terminal needed.
-on:
-  workflow_dispatch:
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v4
-
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Install eas-cli
-        run: npm install -g eas-cli
-
-      - name: Install project dependencies
-        working-directory: veltex-app
-        run: npm install
-
-      - name: Link EAS project
-        working-directory: veltex-app
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: eas init --non-interactive --force
-
-      - name: Trigger EAS build
-        working-directory: veltex-app
-        env:
-          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        run: eas build --platform android --profile preview --non-interactive
