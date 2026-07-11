@@ -1,5 +1,5 @@
 name: Build VELTEX Android App
-name: Build VELTEX Android App
+name: 
 
 # Run this manually from the GitHub Actions tab — no terminal needed.
 on:
