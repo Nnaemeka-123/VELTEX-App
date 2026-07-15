@@ -1,5 +1,6 @@
 name: Build VELTEX Android App
 
+# Run this manually from the GitHub Actions tab — no terminal needed.
 on:
   workflow_dispatch:
 
@@ -28,8 +29,8 @@ jobs:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: eas init --non-interactive --force
 
-      - : Trigger EAS build
+      - name: Trigger EAS build
         working-directory: veltex-app
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-run: eas build--platform android --profile preview --non-interactive
+        run: eas build --platform android --profile preview --non-interactive
