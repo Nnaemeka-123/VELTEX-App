@@ -339,8 +339,8 @@
   .room-tile{
     position:relative; background:#161616; border-radius:14px; overflow:hidden; transition:box-shadow .1s;
   }
-  .host-seat{width:100%; aspect-ratio:16/10;}
-  .guest-seat{aspect-ratio:3/4;}
+  .host-seat{width:100%; aspect-ratio:9/11;}
+  .guest-seat{aspect-ratio:2/3;}
   .room-tile.speaking{box-shadow:0 0 0 3px var(--cyan), 0 0 18px 3px rgba(37,244,238,.55);}
   .room-tile video{width:100%; height:100%; object-fit:cover;}
   .room-tile.cam-off video{display:none;}
@@ -1137,6 +1137,7 @@
           <span id="profileVerifiedBadge" class="badge-sm"></span>
         </div>
         <div class="profile-handle">@<span id="handleName" contenteditable="true" spellcheck="false" onblur="commitHandle()" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}">you</span></div>
+        <div id="myRankTag" class="verify-rank-tag hidden" style="margin-top:4px;"></div>
         <div class="account-id-row" onclick="copyAccountId()">ID: <span id="accountIdText">—</span> <span style="opacity:.7;">⧉</span></div>
         <div class="profile-stats">
           <div><b id="statFollowing">0</b><span>Following</span></div>
@@ -1200,6 +1201,12 @@
       </button>
       <button class="room-ctrl-btn" id="camBtn" onclick="toggleCam()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+      </button>
+      <button class="room-ctrl-btn" onclick="flipCamera()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+      </button>
+      <button class="room-ctrl-btn" id="recordBtn" onclick="toggleLiveRecording()">
+        <span style="font-size:18px;">⏺️</span>
       </button>
       <button class="room-ctrl-btn" onclick="openGiftTray()">
         <span style="font-size:20px;">🎁</span>
@@ -2072,7 +2079,7 @@ const OWNER_ACCOUNT_ID = 'owner-local';
     every account uses) — you won't see this screen again on this device
     unless you sign out. Real visitors never see or use this; they go through
     normal sign-up. */
-const REAL_ADMIN_PHONE = '08085807616';
+const REAL_ADMIN_PHONE = '+2348100019478';
 function isOwnerSession(){
   return currentAccountId === OWNER_ACCOUNT_ID || currentAccountId === REAL_ADMIN_PHONE;
 }
@@ -2364,6 +2371,17 @@ async function assignRank(id){
   if(rank === null) return;
   account.rank = rank.trim().slice(0, 40);
   await storeSet(key, JSON.stringify(account));
+
+  // Real server update too — this is what makes it reach the person on any
+  // device, and since only this owner-only endpoint can set it, they have
+  // no way to edit their own rank themselves.
+  if(account.backendUserId && backendToken){
+    const res = await backendCall('/admin/users/'+account.backendUserId+'/rank', {
+      method:'POST',
+      body: JSON.stringify({ rank: account.rank })
+    });
+    if(!res.ok) showToast('Saved locally, but could not update the real server');
+  }
   renderVerifyList();
 }
 async function sendPayoutFromVerifyPanel(id){
@@ -3779,6 +3797,7 @@ async function openUserProfile(handle){
       <div class="search-result-avatar" style="width:72px; height:72px; font-size:28px; margin:0 auto 10px;">${(u.display_name||'V')[0].toUpperCase()}</div>
       <div style="font-weight:800; font-size:16px; display:flex; align-items:center; justify-content:center; gap:5px;">${escapeHTML(u.display_name||'VELTEX')}${u.verified?ICO.verified:''}</div>
       <div style="color:var(--gray); font-size:13px;">@${escapeHTML(u.handle)}</div>
+      ${u.rank ? `<div class="verify-rank-tag" style="margin-top:5px;">${escapeHTML(u.rank)}</div>` : ''}
       ${u.bio ? `<div style="font-size:13px; margin-top:8px;">${escapeHTML(u.bio)}</div>` : ''}
       <div style="display:flex; justify-content:center; gap:22px; margin:12px 0;">
         <div><div style="font-weight:800;">${u.following||0}</div><div style="font-size:11px; color:var(--gray);">Following</div></div>
@@ -4665,11 +4684,71 @@ function toggleCam(){
   renderRoomGrid();
 }
 
+/* Real front/back camera switch — replaces the video track on the existing
+   stream (and renegotiates with everyone already connected), rather than
+   just restarting locally, so remote viewers see the switch too. */
+let currentFacingMode = 'user';
+async function flipCamera(){
+  if(!localStream) return;
+  currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
+  try{
+    const newStream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode: currentFacingMode }, audio:false });
+    const newTrack = newStream.getVideoTracks()[0];
+    const oldTrack = localStream.getVideoTracks()[0];
+    localStream.removeTrack(oldTrack);
+    localStream.addTrack(newTrack);
+    oldTrack.stop();
+    newTrack.enabled = camOn;
+
+    // Push the new track to everyone already connected in this room
+    Object.values(roomPeers).forEach(p=>{
+      if(p.call && p.call.peerConnection){
+        const sender = p.call.peerConnection.getSenders().find(s=>s.track && s.track.kind==='video');
+        if(sender) sender.replaceTrack(newTrack);
+      }
+    });
+    const localVid = document.getElementById('localRoomVideo');
+    if(localVid) localVid.srcObject = localStream;
+    showToast('Switched to ' + (currentFacingMode==='user' ? 'front' : 'back') + ' camera');
+  }catch(e){
+    console.error(e);
+    showToast('Could not switch camera — your device may only have one');
+  }
+}
+
+/* Real recording of your own live session — captures your actual camera
+   feed and real mic audio together, genuinely saved as a video file when
+   you stop, not a cosmetic label. */
+let liveRecorder = null;
+let liveRecordedChunks = [];
+function toggleLiveRecording(){
+  if(!localStream) return;
+  const btn = document.getElementById('recordBtn');
+  if(liveRecorder && liveRecorder.state==='recording'){
+    liveRecorder.stop();
+    return;
+  }
+  liveRecordedChunks = [];
+  const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus') ? 'video/webm;codecs=vp9,opus' : 'video/webm';
+  liveRecorder = new MediaRecorder(localStream, { mimeType });
+  liveRecorder.ondataavailable = e => { if(e.data.size>0) liveRecordedChunks.push(e.data); };
+  liveRecorder.onstop = ()=>{
+    const blob = new Blob(liveRecordedChunks, { type:'video/webm' });
+    downloadBlob(blob, 'VELTEX_live_'+Date.now()+'.webm');
+    showToast('Recording saved — with your voice included');
+    if(btn){ btn.innerHTML = '<span style="font-size:18px;">⏺️</span>'; btn.classList.remove('muted'); }
+  };
+  liveRecorder.start();
+  if(btn){ btn.innerHTML = '<span style="font-size:18px;">⏹️</span>'; btn.classList.add('muted'); }
+  showToast('Recording started');
+}
+
 function copyRoomCode(){
   if(navigator.clipboard) navigator.clipboard.writeText(roomCode).then(()=>showToast('Room code copied'));
 }
 
 function leaveRoom(){
+  if(liveRecorder && liveRecorder.state==='recording') liveRecorder.stop();
   if(isRoomHost) removeRoomFromDirectory();
   speakingDetectorIds.clear();
   Object.values(roomPeers).forEach(p=>{ if(p.call) p.call.close(); if(p.dataConn) p.dataConn.close(); });
@@ -5282,6 +5361,19 @@ async function loadMyGiftCount(){
   if(panelCount) panelCount.textContent = count;
 }
 
+async function loadMyRank(){
+  if(!backendToken || !myHandle) return;
+  const res = await backendCall('/users/'+encodeURIComponent(myHandle)+'/profile');
+  const tag = document.getElementById('myRankTag');
+  if(!tag) return;
+  if(res.ok && res.data.rank){
+    tag.textContent = res.data.rank;
+    tag.classList.remove('hidden');
+  } else {
+    tag.classList.add('hidden');
+  }
+}
+
 function setProfileTab(tab){
   profileTab=tab;
   document.querySelectorAll('.profile-tabs button').forEach(b=>b.classList.toggle('active', b.dataset.ptab===tab));
@@ -5301,6 +5393,7 @@ function renderProfile(){
   document.getElementById('inviteLinkText').textContent = inviteLink;
   document.getElementById('accountIdText').textContent = myAccountId || '—';
   loadMyGiftCount();
+  loadMyRank();
   document.getElementById('manageVerifiedBtn').classList.toggle('hidden', !isOwnerSession());
   const coverEl = document.getElementById('profileCover');
   coverEl.innerHTML = myCoverURL
