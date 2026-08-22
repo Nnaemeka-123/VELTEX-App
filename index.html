@@ -2358,6 +2358,17 @@ async function toggleUserVerified(id){
   const account = JSON.parse(raw);
   account.verified = !account.verified;
   await storeSet(key, JSON.stringify(account));
+
+  // Also update the real server record — otherwise this badge is purely
+  // cosmetic and things like Live eligibility never actually see it
+  if(account.backendUserId && backendToken){
+    const res = await backendCall('/admin/users/'+account.backendUserId+'/verify', { method:'POST' });
+    if(!res.ok){
+      showToast(res.status===403 ? "Couldn't update the real server — this device isn't signed in as the real admin account" : 'Local badge updated, but the real server was unreachable');
+    }
+  } else if(!account.backendUserId){
+    showToast('Updated locally — this account has no real phone number connected yet, so there\'s no real server record to update');
+  }
   if(id === currentAccountId){
     isVerified = account.verified;
     renderProfile();
