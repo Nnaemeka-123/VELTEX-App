@@ -2072,11 +2072,38 @@ const OWNER_ACCOUNT_ID = 'owner-local';
     every account uses) — you won't see this screen again on this device
     unless you sign out. Real visitors never see or use this; they go through
     normal sign-up. */
+const REAL_ADMIN_PHONE = '08085807616';
+function isOwnerSession(){
+  return currentAccountId === OWNER_ACCOUNT_ID || currentAccountId === REAL_ADMIN_PHONE;
+}
+
 async function continueAsOwner(){
   const entered = prompt('Enter the owner code:');
   if(entered === null) return;
   if(entered !== OWNER_ADMIN_CODE){ showToast('Incorrect owner code'); return; }
   adminUnlockedThisSession = true;
+
+  // Sign into the real admin account directly, if it exists on this device —
+  // this is what actually makes Company Dashboard, verify, and everything
+  // else work with one tap, instead of a separate fake local-only identity.
+  const realKey = 'account:' + REAL_ADMIN_PHONE;
+  const realRaw = await storeGet(realKey);
+  if(realRaw){
+    const realAccount = JSON.parse(realRaw);
+    await logInWithAccount(realAccount);
+    const savedToken = await storeGet('backendToken:'+REAL_ADMIN_PHONE);
+    if(savedToken && realAccount.backendUserId){
+      backendToken = savedToken;
+      backendUserId = realAccount.backendUserId;
+      loadMyInvites();
+    }
+    renderStoriesBar();
+    showToast('Signed in as your real admin account');
+    return;
+  }
+
+  // Fallback — no real account connected on this device yet, use the old
+  // local-only identity so owner tools still open
   const key = 'account:' + OWNER_ACCOUNT_ID;
   const raw = await storeGet(key);
   const account = raw ? JSON.parse(raw) : {
@@ -2087,6 +2114,7 @@ async function continueAsOwner(){
   if(!raw) await storeSet(key, JSON.stringify(account));
   await logInWithAccount(account);
   renderStoriesBar();
+  showToast('Signed in with local admin tools — connect a real phone number in Settings for full access');
 }
 
 function confirmSignOut(){
@@ -2442,9 +2470,9 @@ async function loadRealInbox(){
 /* ============ SETTINGS ============ */
 function openSettings(){
   document.getElementById('settingsBackdrop').classList.add('show');
-  document.getElementById('adsStatusSection').classList.toggle('hidden', currentAccountId !== OWNER_ACCOUNT_ID);
-  document.getElementById('settingsVerifiedRow').classList.toggle('hidden', currentAccountId !== OWNER_ACCOUNT_ID);
-  document.getElementById('settingsCompanyRow').classList.toggle('hidden', currentAccountId !== OWNER_ACCOUNT_ID);
+  document.getElementById('adsStatusSection').classList.toggle('hidden', !isOwnerSession());
+  document.getElementById('settingsVerifiedRow').classList.toggle('hidden', !isOwnerSession());
+  document.getElementById('settingsCompanyRow').classList.toggle('hidden', !isOwnerSession());
   document.getElementById('settingsConnectPhoneRow').classList.toggle('hidden', !!backendToken);
   renderGoogleStatus();
 }
@@ -2545,7 +2573,7 @@ async function loadGiftEarnings(){
 
 function renderWallet(){
   const body = document.querySelector('#walletBackdrop .modal-body');
-  const canSeePayout = currentAccountId === OWNER_ACCOUNT_ID || isVerified;
+  const canSeePayout = isOwnerSession() || isVerified;
 
   if(myPinHash && !walletUnlocked){
     body.innerHTML = `
@@ -4252,7 +4280,7 @@ function showLiveError(msg){
 }
 
 async function checkLiveEligibility(){
-  if(currentAccountId === OWNER_ACCOUNT_ID) return true; // owner bypass account, not tied to a real backend profile
+  if(currentAccountId === OWNER_ACCOUNT_ID) return true; // local-only fallback owner account, not tied to a real backend profile
   if(!backendToken){
     showLiveError('Sign in with your real account to go live.');
     return false;
@@ -5273,7 +5301,7 @@ function renderProfile(){
   document.getElementById('inviteLinkText').textContent = inviteLink;
   document.getElementById('accountIdText').textContent = myAccountId || '—';
   loadMyGiftCount();
-  document.getElementById('manageVerifiedBtn').classList.toggle('hidden', currentAccountId !== OWNER_ACCOUNT_ID);
+  document.getElementById('manageVerifiedBtn').classList.toggle('hidden', !isOwnerSession());
   const coverEl = document.getElementById('profileCover');
   coverEl.innerHTML = myCoverURL
     ? `<img src="${myCoverURL}">`
