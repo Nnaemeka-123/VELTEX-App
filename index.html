@@ -729,6 +729,44 @@
     display:inline-block; margin-top:3px; font-size:10.5px; font-weight:700; color:var(--cyan);
     background:rgba(37,244,238,.12); padding:2px 8px; border-radius:8px;
   }
+  .market-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  .market-card{background:var(--panel); border-radius:12px; overflow:hidden; cursor:pointer;}
+  .market-card-img{width:100%; aspect-ratio:1; background:#111; display:flex; align-items:center; justify-content:center; font-size:32px; color:var(--gray);}
+  .market-card-img img{width:100%; height:100%; object-fit:cover;}
+  .market-card-info{padding:8px 10px;}
+  .market-card-title{font-size:12.5px; font-weight:700; line-height:1.3; margin-bottom:3px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;}
+  .market-card-price{font-size:13px; font-weight:800; color:var(--cyan);}
+  .market-card-seller{font-size:10.5px; color:var(--gray); margin-top:2px;}
+  .gift-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:10px;}
+  .gift-tile{
+    background:var(--panel2); border-radius:10px; padding:12px 6px; text-align:center; cursor:pointer;
+    border:1px solid transparent; transition:border-color .15s;
+  }
+  .gift-tile:active{border-color:var(--cyan);}
+  .gift-emoji{font-size:30px; margin-bottom:4px;}
+  .gift-name{font-size:11px; font-weight:600;}
+  .gift-cost{font-size:10.5px; color:var(--cyan); margin-top:2px;}
+  #giftFlyLayer{position:fixed; inset:0; pointer-events:none; z-index:200; overflow:hidden;}
+  .gift-fly{
+    position:absolute; bottom:100px; font-size:44px; animation:giftFlyUp 2.2s ease-out forwards;
+  }
+  @keyframes giftFlyUp{
+    0%{ transform:translateY(0) scale(0.5); opacity:0; }
+    15%{ transform:translateY(-40px) scale(1.2); opacity:1; }
+    80%{ transform:translateY(-320px) scale(1); opacity:1; }
+    100%{ transform:translateY(-420px) scale(0.8); opacity:0; }
+  }
+  .gift-toast{
+    position:fixed; top:90px; left:50%; transform:translateX(-50%); z-index:201;
+    background:rgba(0,0,0,.75); color:#fff; padding:8px 16px; border-radius:20px; font-size:13px; font-weight:600;
+    display:flex; align-items:center; gap:6px; animation:giftToastFade 2.5s ease-out forwards;
+  }
+  @keyframes giftToastFade{
+    0%{ opacity:0; transform:translate(-50%,-10px); }
+    15%{ opacity:1; transform:translate(-50%,0); }
+    80%{ opacity:1; }
+    100%{ opacity:0; }
+  }
   .switch-account-row{
     display:flex; align-items:center; gap:12px; padding:12px 4px; border-bottom:1px solid var(--border); cursor:pointer;
   }
@@ -966,6 +1004,72 @@
   </div>
   <input type="file" id="storyFileInput" accept="video/*,image/*" class="hidden" onchange="handleStoryFileSelect(event)">
 
+  <!-- MARKETPLACE -->
+  <div id="view-market" class="view">
+    <div class="page">
+      <div class="friends-top-row">
+        <h2 style="font-size:18px; font-weight:800;">Marketplace</h2>
+        <button class="friends-search-btn" onclick="openCreateListing()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+      </div>
+      <button class="settings-row" style="margin-bottom:10px;" onclick="openMyOrders()">
+        <span class="settings-row-icon">📦</span><span class="settings-row-label">Orders on my listings</span><span class="settings-chevron">›</span>
+      </button>
+      <div id="marketGrid" class="market-grid"></div>
+    </div>
+  </div>
+
+  <!-- CREATE LISTING -->
+  <div class="modal-backdrop" id="createListingBackdrop">
+    <div class="modal">
+      <div class="modal-head"><h3>New listing</h3><button class="icon-btn" onclick="closeCreateListing()"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>
+      <div class="modal-body">
+        <div class="preview-wrap hidden" id="listingImagePreviewWrap"></div>
+        <button class="live-btn" style="margin-bottom:12px;" onclick="document.getElementById('listingImageInput').click()">📷 Add product photo</button>
+        <input type="file" id="listingImageInput" accept="image/*" class="file-input-hidden" onchange="handleListingImageSelect(event)">
+        <div class="auth-field" style="margin-bottom:10px;">
+          <label>Product title</label>
+          <input type="text" id="listingTitle" placeholder="e.g. Wireless Earbuds">
+        </div>
+        <div class="auth-field" style="margin-bottom:10px;">
+          <label>Description</label>
+          <input type="text" id="listingDescription" placeholder="Short description">
+        </div>
+        <div class="auth-field" style="margin-bottom:10px;">
+          <label>Shopify / dropshipping / product link</label>
+          <input type="text" id="listingLink" placeholder="https://...">
+        </div>
+        <div class="auth-field" style="margin-bottom:10px;">
+          <label>Price (₦)</label>
+          <input type="number" id="listingPrice" placeholder="e.g. 5000">
+        </div>
+        <div class="auth-field" style="margin-bottom:12px;">
+          <label>Your payment details (shown to buyers)</label>
+          <input type="text" id="listingPayout" placeholder="Bank name, account number, account name">
+        </div>
+        <div id="listingError" style="color:#ff5c5c; font-size:12.5px; margin-bottom:10px;"></div>
+        <button class="live-btn" onclick="submitListing()">Post listing</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- LISTING DETAIL / BUY -->
+  <div class="modal-backdrop" id="listingDetailBackdrop">
+    <div class="modal">
+      <div class="modal-head"><h3>Product</h3><button class="icon-btn" onclick="closeListingDetail()"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>
+      <div class="modal-body" id="listingDetailBody"></div>
+    </div>
+  </div>
+
+  <!-- MY ORDERS (seller view) -->
+  <div class="modal-backdrop" id="myOrdersBackdrop">
+    <div class="modal">
+      <div class="modal-head"><h3>Orders on my listings</h3><button class="icon-btn" onclick="closeMyOrders()"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>
+      <div class="modal-body" id="myOrdersBody"></div>
+    </div>
+  </div>
+
   <!-- LIVE -->
   <div id="view-live" class="view">
     <div class="page" id="livePage">
@@ -985,11 +1089,7 @@
         <div id="liveJoinPanel" class="hidden">
           <p class="live-sub">Tap an open seat to join — no code needed.</p>
           <div class="seats-row" id="seatsRow"></div>
-          <button class="live-code-toggle" onclick="toggleManualCode()" id="manualCodeToggle">Have a code instead?</button>
-          <div id="manualCodePanel" class="hidden" style="margin-top:10px;">
-            <input class="room-code-input" id="joinRoomCode" placeholder="ROOM CODE" maxlength="8" autocapitalize="characters">
-            <button class="live-btn" onclick="joinRoom()">Join with code</button>
-          </div>
+          <input class="room-code-input hidden" id="joinRoomCode">
         </div>
         <div id="liveError"></div>
       </div>
@@ -1071,9 +1171,17 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
           Reposts
         </button>
+        <button data-ptab="gifts" onclick="setProfileTab('gifts')" style="flex-direction:row; gap:4px;">
+          🎁 <span id="giftBadgeCount">0</span>
+        </button>
       </div>
       <div class="grid3" id="profileVideos"></div>
       <div id="profileEmpty"></div>
+      <div id="giftsPanel" class="hidden" style="padding:30px 16px; text-align:center;">
+        <div style="font-size:40px; margin-bottom:8px;">🎁</div>
+        <div style="font-size:24px; font-weight:800;" id="giftsPanelCount">0</div>
+        <div style="font-size:12.5px; color:var(--gray); margin-top:4px;">real gifts received on Live</div>
+      </div>
     </div>
   </div>
 
@@ -1093,6 +1201,9 @@
       <button class="room-ctrl-btn" id="camBtn" onclick="toggleCam()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
       </button>
+      <button class="room-ctrl-btn" onclick="openGiftTray()">
+        <span style="font-size:20px;">🎁</span>
+      </button>
       <button class="room-ctrl-btn" onclick="openGamesDrawer()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="3"/><path d="M8 10v4M6 12h4M15.5 11.5h.01M18 13.5h.01"/></svg>
       </button>
@@ -1102,6 +1213,30 @@
     </div>
     <div id="roomError"></div>
   </div>
+
+  <!-- GIFT TRAY -->
+  <div class="modal-backdrop" id="giftTrayBackdrop">
+    <div class="modal">
+      <div class="modal-head">
+        <h3>Send a gift</h3>
+        <div id="myCoinBalance" style="font-size:13px; font-weight:700; color:var(--cyan);">🪙 0</div>
+        <button class="icon-btn" onclick="closeGiftTray()"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+      </div>
+      <div class="modal-body">
+        <div id="giftRecipientLabel" style="font-size:12px; color:var(--gray); margin-bottom:10px;"></div>
+        <div class="gift-grid">
+          <div class="gift-tile" onclick="sendGift('🎁','Gift Box',20)"><div class="gift-emoji">🎁</div><div class="gift-name">Gift Box</div><div class="gift-cost">🪙 20</div></div>
+          <div class="gift-tile" onclick="sendGift('🧧','Red Packet',50)"><div class="gift-emoji">🧧</div><div class="gift-name">Red Packet</div><div class="gift-cost">🪙 50</div></div>
+          <div class="gift-tile" onclick="sendGift('🌹','Rose',10)"><div class="gift-emoji">🌹</div><div class="gift-name">Rose</div><div class="gift-cost">🪙 10</div></div>
+          <div class="gift-tile" onclick="sendGift('💎','Diamond',200)"><div class="gift-emoji">💎</div><div class="gift-name">Diamond</div><div class="gift-cost">🪙 200</div></div>
+          <div class="gift-tile" onclick="sendGift('👑','Crown',500)"><div class="gift-emoji">👑</div><div class="gift-name">Crown</div><div class="gift-cost">🪙 500</div></div>
+          <div class="gift-tile" onclick="sendGift('🚀','Rocket',1000)"><div class="gift-emoji">🚀</div><div class="gift-name">Rocket</div><div class="gift-cost">🪙 1000</div></div>
+        </div>
+        <div id="giftStatus" style="font-size:12.5px; color:var(--gray); margin-top:10px;"></div>
+      </div>
+    </div>
+  </div>
+  <div id="giftFlyLayer"></div>
 
   <!-- WAITING FOR HOST APPROVAL -->
   <div class="room-waiting hidden" id="roomWaitingOverlay">
@@ -1173,6 +1308,10 @@
     </button>
     <button class="nav-btn nav-live" data-nav="live" onclick="showView('live')">
       <span class="nav-live-block">LIVE</span>
+    </button>
+    <button class="nav-btn" data-nav="market" onclick="showView('market')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l1-5h16l1 5M3 9v10a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V9M3 9h18M8 13a3 3 0 0 0 6 0"/></svg>
+      Market
     </button>
     <button class="nav-btn" data-nav="inbox" onclick="showView('inbox')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
@@ -2314,6 +2453,13 @@ function closeWallet(){ document.getElementById('walletBackdrop').classList.remo
 
 function currencySymbol(){ return CURRENCY_BY_REGION[myRegion] || '$'; }
 
+async function loadGiftEarnings(){
+  const el = document.getElementById('giftEarningsAmount');
+  if(!el || !backendToken) return;
+  const res = await backendCall('/users/me/coins');
+  if(res.ok) el.textContent = '🪙 ' + res.data.earnings_balance;
+}
+
 function renderWallet(){
   const body = document.querySelector('#walletBackdrop .modal-body');
   const canSeePayout = currentAccountId === OWNER_ACCOUNT_ID || isVerified;
@@ -2338,6 +2484,12 @@ function renderWallet(){
     </div>
     <div class="settings-group-label">History</div>
     <div id="walletHistoryList"></div>
+
+    <div class="settings-group-label">Gift Earnings</div>
+    <div style="background:var(--panel2); border-radius:10px; padding:14px; margin-bottom:10px;">
+      <div style="font-size:24px; font-weight:800; color:var(--cyan);" id="giftEarningsAmount">🪙 0</div>
+      <div style="font-size:11.5px; color:var(--gray); margin-top:4px;">Real, tracked on the server — grows every time someone sends you a gift on Live. Actual cash-out to your bank isn't connected yet, so this stays as a pending balance until that's set up.</div>
+    </div>
 
     <div class="settings-group-label hidden" id="payoutDetailsLabel">Payout details</div>
     <div class="hidden" id="payoutDetailsSection" style="background:var(--panel2); border-radius:10px; padding:12px;">
@@ -2378,6 +2530,7 @@ function renderWallet(){
   document.getElementById('payoutUsdt').value = myPayoutDetails.usdt || '';
   document.getElementById('payoutDetailsLabel').classList.toggle('hidden', !canSeePayout);
   document.getElementById('payoutDetailsSection').classList.toggle('hidden', !canSeePayout);
+  loadGiftEarnings();
 
   document.getElementById('walletBalanceAmount').textContent = currencySymbol() + myWalletBalance.toFixed(2);
   document.getElementById('walletVerifiedNote').textContent = isVerified
@@ -2617,6 +2770,7 @@ function showView(name){
   if(name==='profile') renderProfile();
   if(name==='live') renderJoinSeats();
   if(name==='inbox') renderInbox();
+  if(name==='market') loadMarketListings();
 }
 
 function pauseAllVideos(){
@@ -2750,10 +2904,36 @@ function buildFeedAdCard(idx){
   const el = document.createElement('div');
   el.className = 'post feed-ad-card';
   const adsReady = !ADSENSE_PUBLISHER_ID.includes('REPLACE') && !ADSENSE_AD_SLOT.includes('REPLACE');
-  if(!adsReady){
+  const adsterraReady = !ADSTERRA_BANNER_KEY.includes('REPLACE');
+
+  if(!adsReady && !adsterraReady){
     el.classList.add('hidden');
     return el;
   }
+
+  // Alternate between AdSense and Adsterra on different ad slots, so neither
+  // network gets hammered with repeated requests on the same scroll
+  const useAdsterra = adsterraReady && (idx % 10 === 5 || !adsReady);
+
+  if(useAdsterra){
+    el.innerHTML = `
+      <div class="feed-ad-label">Sponsored</div>
+      <div class="feed-ad-inner" id="feedAdsterra-${idx}" style="display:flex; align-items:center; justify-content:center;"></div>
+    `;
+    setTimeout(()=>{
+      const slot = document.getElementById('feedAdsterra-'+idx);
+      if(!slot) return;
+      const optionsScript = document.createElement('script');
+      optionsScript.textContent = `atOptions = ${JSON.stringify({ key: ADSTERRA_BANNER_KEY, format:'iframe', height:60, width:468, params:{} })};`;
+      slot.appendChild(optionsScript);
+      const invokeScript = document.createElement('script');
+      invokeScript.src = `https://www.highperformanceformat.com/${ADSTERRA_BANNER_KEY}/invoke.js`;
+      slot.appendChild(invokeScript);
+    }, 0);
+    return el;
+  }
+
+  if(!adsReady){ el.classList.add('hidden'); return el; }
   el.innerHTML = `
     <div class="feed-ad-label">Sponsored</div>
     <div class="feed-ad-inner">
@@ -3047,15 +3227,19 @@ function burstHeart(id){
 }
 
 function toggleLike(id){ doLike(id); }
-function doLike(id, forceLikeOnly){
+async function doLike(id, forceLikeOnly){
   const p = posts.find(x=>x.id===id);
   if(forceLikeOnly && p.liked) return;
+  const wasLiked = p.liked;
   p.liked = forceLikeOnly ? true : !p.liked;
   p.likes += p.liked ? 1 : -1;
   const btn = document.getElementById('likebtn-'+id);
   const count = document.getElementById('likecount-'+id);
   if(btn) btn.classList.toggle('liked', p.liked);
   if(count) count.textContent = fmt(p.likes);
+  if(p.backendId && backendToken){
+    backendCall('/videos/'+p.backendId+'/like', { method: p.liked ? 'POST' : 'DELETE' }).catch(()=>{});
+  }
 }
 
 function toggleFollow(id){
@@ -3704,6 +3888,46 @@ function toggleFriendSearch(){
   if(!row.classList.contains('hidden')) document.getElementById('friendSearch').focus();
 }
 
+function openTopSearch(){
+  document.getElementById('topSearchOverlay').classList.remove('hidden');
+  document.getElementById('topSearchInput').value = '';
+  document.getElementById('topSearchBody').innerHTML = '';
+  document.getElementById('topSearchInput').focus();
+}
+function closeTopSearch(){
+  document.getElementById('topSearchOverlay').classList.add('hidden');
+}
+
+let topSearchDebounceTimer = null;
+function renderTopSearch(){
+  const q = (document.getElementById('topSearchInput').value||'').trim();
+  const body = document.getElementById('topSearchBody');
+  if(!q){ body.innerHTML = ''; return; }
+  body.innerHTML = `<div class="empty-state"><p>Searching…</p></div>`;
+  clearTimeout(topSearchDebounceTimer);
+  topSearchDebounceTimer = setTimeout(async ()=>{
+    const res = await backendCall('/users/search?q=' + encodeURIComponent(q));
+    if(!res.ok){
+      body.innerHTML = `<div class="empty-state"><p>${res.status===0 ? "Couldn't reach the search server — it may be waking up, try again in a minute." : "Something went wrong. Try again shortly."}</p></div>`;
+      return;
+    }
+    if(!res.data.length){
+      body.innerHTML = `<div class="empty-state"><p>No results for "${escapeHTML(q)}"</p></div>`;
+      return;
+    }
+    body.innerHTML = res.data.map(u=>`
+      <div class="search-result-row" onclick="closeTopSearch(); openUserProfile('${u.handle}')" style="cursor:pointer;">
+        <div class="search-result-avatar">${(u.display_name||'V')[0].toUpperCase()}</div>
+        <div class="search-result-info">
+          <div class="search-result-name">${escapeHTML(u.display_name||'VELTEX')}${u.verified?' '+ICO.verified:''}</div>
+          <div class="search-result-handle">@${escapeHTML(u.handle)}</div>
+        </div>
+        <button class="search-follow-btn" id="followbtn-${u.id}" onclick="event.stopPropagation();toggleRealFollow('${u.id}')">Follow</button>
+      </div>
+    `).join('');
+  }, 400);
+}
+
 let searchDebounceTimer = null;
 function renderFriendSearch(){
   const q = (document.getElementById('friendSearch').value||'').trim();
@@ -3837,18 +4061,40 @@ function setLiveMode(mode){
    instead?" fallback becomes the real way to join across devices.
 ============================================================================ */
 async function publishRoomToDirectory(){
-  if(!hasArtifactStorage || !roomCode) return;
-  try{
-    await window.storage.set('liveroom:'+roomCode, JSON.stringify({
-      code: roomCode, hostName: myDisplayName, hostHandle: myHandle, startedAt: Date.now()
-    }), true);
-  }catch(e){ console.error('directory publish failed', e); }
+  window.currentRoomHostHandle = myHandle;
+  if(!roomCode) return;
+  if(backendToken){
+    try{ await backendCall('/live-rooms', { method:'POST', body: JSON.stringify({ code: roomCode, hostDisplayName: myDisplayName }) }); }
+    catch(e){ console.error('live room publish failed', e); }
+  }
+  if(hasArtifactStorage){
+    try{
+      await window.storage.set('liveroom:'+roomCode, JSON.stringify({
+        code: roomCode, hostName: myDisplayName, hostHandle: myHandle, startedAt: Date.now()
+      }), true);
+    }catch(e){}
+  }
 }
 async function removeRoomFromDirectory(){
-  if(!hasArtifactStorage || !roomCode) return;
-  try{ await window.storage.delete('liveroom:'+roomCode, true); }catch(e){}
+  if(!roomCode) return;
+  if(backendToken){
+    try{ await backendCall('/live-rooms/'+roomCode, { method:'DELETE' }); }catch(e){}
+  }
+  if(hasArtifactStorage){
+    try{ await window.storage.delete('liveroom:'+roomCode, true); }catch(e){}
+  }
 }
 async function sharedListRooms(){
+  // Real backend first — this is what actually works once deployed
+  if(backendToken){
+    const res = await backendCall('/live-rooms');
+    if(res.ok){
+      return res.data
+        .map(r=>({ code:r.code, hostName:r.host_display_name, hostHandle:r.host_handle, startedAt:new Date(r.started_at).getTime() }))
+        .filter(r => r.code !== roomCode);
+    }
+  }
+  // Falls back to the Claude-preview-only mechanism if the real server's unreachable
   if(!hasArtifactStorage) return [];
   try{
     const listRes = await window.storage.list('liveroom:', true);
@@ -3857,15 +4103,14 @@ async function sharedListRooms(){
     for(const key of keys){
       try{ const r = await window.storage.get(key, true); if(r) rooms.push(JSON.parse(r.value)); }catch(e){}
     }
-    const cutoff = Date.now() - 3*60*60*1000; // treat rooms older than 3h as stale
+    const cutoff = Date.now() - 3*60*60*1000;
     return rooms.filter(r => r.startedAt > cutoff && r.code !== roomCode);
   }catch(e){ return []; }
 }
 
 /** Weaves any currently-live rooms into the Home feed, TikTok-style — tap to
-    join, or keep scrolling past like any other video. Same real limitation
-    as the seats list: room discovery like this only works inside Claude's
-    own preview (shared storage), not once deployed standalone. */
+    join, or keep scrolling past like any other video. Uses the real backend,
+    so this genuinely works across different people's devices once deployed. */
 async function injectLiveCardsIntoFeed(){
   const feed = document.getElementById('feed');
   if(!feed || feedMode==='following') return; // keep Following feed to just people you follow
@@ -3883,7 +4128,7 @@ async function injectLiveCardsIntoFeed(){
         <div class="post-user">@${r.hostHandle||'live'}</div>
         <div class="post-caption">${r.hostName||'Someone'} is live right now</div>
       </div>
-      <button class="live-card-join" onclick="joinRoomByCode('${r.code}')">Join Live</button>
+      <button class="live-card-join" onclick="window.currentRoomHostHandle='${r.hostHandle}'; joinRoomByCode('${r.code}')">Join Live</button>
     `;
     feed.insertBefore(card, feed.firstChild);
   });
@@ -3896,7 +4141,7 @@ async function renderJoinSeats(){
   const rooms = await sharedListRooms();
   if(!rooms.length){
     row.innerHTML = `<div style="font-size:12px; color:var(--gray); padding:8px; max-width:240px;">
-      No open rooms right now${hasArtifactStorage ? '' : ' (room discovery only works inside Claude\'s preview — use a code below once this is deployed)'}. Start one, or use a code if someone shared one with you.
+      No open rooms right now. Start one, and anyone real on VELTEX will be able to find and join it.
     </div>`;
     return;
   }
@@ -3911,10 +4156,6 @@ async function renderJoinSeats(){
   `).join('');
 }
 
-function toggleManualCode(){
-  document.getElementById('manualCodePanel').classList.toggle('hidden');
-}
-
 async function getLocalStream(){
   return navigator.mediaDevices.getUserMedia({ video:true, audio:true });
 }
@@ -3923,8 +4164,28 @@ function showLiveError(msg){
   document.getElementById('liveError').innerHTML = `<div class="live-error">${msg}</div>`;
 }
 
+async function checkLiveEligibility(){
+  if(currentAccountId === OWNER_ACCOUNT_ID) return true; // owner bypass account, not tied to a real backend profile
+  if(!backendToken){
+    showLiveError('Sign in with your real account to go live.');
+    return false;
+  }
+  const res = await backendCall('/users/me/live-eligibility');
+  if(!res.ok){
+    showLiveError(res.status===0 ? "Couldn't reach the server — try again in a minute." : "Couldn't check your eligibility right now.");
+    return false;
+  }
+  const { eligible, followerCount, likeCount, verified, required } = res.data;
+  if(eligible) return true;
+  if(verified) return true;
+  showLiveError(`You need ${required} followers and ${required} likes to go live (or be verified). You currently have ${followerCount} followers and ${likeCount} likes.`);
+  return false;
+}
+
 async function createRoom(){
   document.getElementById('liveError').innerHTML='';
+  const eligible = await checkLiveEligibility();
+  if(!eligible) return;
   try{
     localStream = await getLocalStream();
   }catch(e){
@@ -4310,6 +4571,201 @@ function leaveRoom(){
 }
 
 /* ============ GAMES DRAWER ============ */
+let giftRecipientId = null;
+let giftRecipientHandle = null;
+
+/* ============================================================================
+   MARKETPLACE — real listings and orders via the backend
+============================================================================ */
+let listingImageData = null;
+
+async function loadMarketListings(){
+  const grid = document.getElementById('marketGrid');
+  grid.innerHTML = `<div class="empty-state"><p>Loading…</p></div>`;
+  const res = await backendCall('/marketplace/listings');
+  if(!res.ok){
+    grid.innerHTML = `<div class="empty-state"><p>${res.status===0 ? "Couldn't reach the server — it may be waking up, try again in a minute." : "Couldn't load listings."}</p></div>`;
+    return;
+  }
+  if(!res.data.length){
+    grid.innerHTML = `<div class="empty-state"><p>No listings yet. Tap + to post the first one.</p></div>`;
+    return;
+  }
+  window.__marketListings = res.data;
+  grid.innerHTML = res.data.map(l=>`
+    <div class="market-card" onclick="openListingDetail('${l.id}')">
+      <div class="market-card-img">${l.image_data ? `<img src="${l.image_data}">` : '🛍️'}</div>
+      <div class="market-card-info">
+        <div class="market-card-title">${escapeHTML(l.title)}</div>
+        <div class="market-card-price">${l.currency==='NGN'?'₦':l.currency}${Number(l.price).toLocaleString()}</div>
+        <div class="market-card-seller">@${escapeHTML(l.handle)}${l.verified?' '+ICO.verified:''}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function openCreateListing(){
+  if(!backendToken){ showToast('Sign in with your real account to post a listing'); return; }
+  listingImageData = null;
+  document.getElementById('listingImagePreviewWrap').innerHTML = '';
+  document.getElementById('listingImagePreviewWrap').classList.add('hidden');
+  document.getElementById('listingTitle').value = '';
+  document.getElementById('listingDescription').value = '';
+  document.getElementById('listingLink').value = '';
+  document.getElementById('listingPrice').value = '';
+  document.getElementById('listingPayout').value = '';
+  document.getElementById('listingError').textContent = '';
+  document.getElementById('createListingBackdrop').classList.add('show');
+}
+function closeCreateListing(){ document.getElementById('createListingBackdrop').classList.remove('show'); }
+
+async function handleListingImageSelect(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  listingImageData = await fileToBase64(file);
+  const wrap = document.getElementById('listingImagePreviewWrap');
+  wrap.innerHTML = `<img src="${listingImageData}">`;
+  wrap.classList.remove('hidden');
+}
+
+async function submitListing(){
+  const title = document.getElementById('listingTitle').value.trim();
+  const description = document.getElementById('listingDescription').value.trim();
+  const productLink = document.getElementById('listingLink').value.trim();
+  const price = parseFloat(document.getElementById('listingPrice').value);
+  const payoutInfo = document.getElementById('listingPayout').value.trim();
+  const errEl = document.getElementById('listingError');
+
+  if(!title){ errEl.textContent = 'Add a title.'; return; }
+  if(!price || price <= 0){ errEl.textContent = 'Add a valid price.'; return; }
+  if(!payoutInfo){ errEl.textContent = 'Add your payment details so buyers know how to pay you.'; return; }
+
+  errEl.textContent = 'Posting…';
+  const res = await backendCall('/marketplace/listings', {
+    method:'POST',
+    body: JSON.stringify({ title, description, productLink, imageData: listingImageData, price, currency:'NGN', payoutInfo })
+  });
+  if(!res.ok){ errEl.textContent = res.error || 'Could not post listing.'; return; }
+  closeCreateListing();
+  showToast('Listing posted');
+  loadMarketListings();
+}
+
+function openListingDetail(id){
+  const l = (window.__marketListings||[]).find(x=>x.id===id);
+  if(!l) return;
+  const body = document.getElementById('listingDetailBody');
+  body.innerHTML = `
+    ${l.image_data ? `<img src="${l.image_data}" style="width:100%; border-radius:10px; margin-bottom:12px;">` : ''}
+    <div style="font-weight:800; font-size:16px; margin-bottom:4px;">${escapeHTML(l.title)}</div>
+    <div style="color:var(--cyan); font-weight:800; font-size:18px; margin-bottom:10px;">₦${Number(l.price).toLocaleString()}</div>
+    ${l.description ? `<div style="font-size:13px; margin-bottom:10px;">${escapeHTML(l.description)}</div>` : ''}
+    ${l.product_link ? `<a href="${escapeHTML(l.product_link)}" target="_blank" style="font-size:12.5px; color:var(--cyan); word-break:break-all;">${escapeHTML(l.product_link)}</a>` : ''}
+    <div style="font-size:12px; color:var(--gray); margin:12px 0;">Sold by @${escapeHTML(l.handle)}${l.verified?' '+ICO.verified:''}</div>
+    <div class="auth-field" style="margin-bottom:8px;"><label>Your full name</label><input type="text" id="buyerName"></div>
+    <div class="auth-field" style="margin-bottom:8px;"><label>Your phone number</label><input type="tel" id="buyerPhone"></div>
+    <div class="auth-field" style="margin-bottom:10px;"><label>Delivery address</label><input type="text" id="buyerAddress"></div>
+    <div id="orderError" style="color:#ff5c5c; font-size:12.5px; margin-bottom:10px;"></div>
+    <button class="live-btn" onclick="submitOrder('${l.id}')">Order — pay seller directly</button>
+    <div class="auth-note" style="margin-top:10px;">VELTEX doesn't process this payment — you'll pay the seller directly using the details they share after ordering. Only buy from sellers you trust.</div>
+  `;
+  document.getElementById('listingDetailBackdrop').classList.add('show');
+}
+function closeListingDetail(){ document.getElementById('listingDetailBackdrop').classList.remove('show'); }
+
+async function submitOrder(listingId){
+  if(!backendToken){ showToast('Sign in with your real account to order'); return; }
+  const buyerName = document.getElementById('buyerName').value.trim();
+  const buyerPhone = document.getElementById('buyerPhone').value.trim();
+  const buyerAddress = document.getElementById('buyerAddress').value.trim();
+  const errEl = document.getElementById('orderError');
+  if(!buyerName || !buyerPhone || !buyerAddress){ errEl.textContent = 'Fill in all three fields.'; return; }
+  errEl.textContent = 'Placing order…';
+  const res = await backendCall('/marketplace/listings/'+listingId+'/order', {
+    method:'POST',
+    body: JSON.stringify({ buyerName, buyerPhone, buyerAddress })
+  });
+  if(!res.ok){ errEl.textContent = res.error || 'Could not place order.'; return; }
+  const l = (window.__marketListings||[]).find(x=>x.id===listingId);
+  closeListingDetail();
+  showToast('Order placed — seller: ' + (l ? l.handle : ''));
+  alert('Order placed!\n\nPay the seller directly using:\n\n' + (l ? l.payout_info || 'their shared payment details' : ''));
+}
+
+async function openMyOrders(){
+  if(!backendToken){ showToast('Sign in with your real account first'); return; }
+  const body = document.getElementById('myOrdersBody');
+  body.innerHTML = `<div class="empty-state"><p>Loading…</p></div>`;
+  document.getElementById('myOrdersBackdrop').classList.add('show');
+  const res = await backendCall('/marketplace/my-orders');
+  if(!res.ok){ body.innerHTML = `<div class="empty-state"><p>Couldn't load orders.</p></div>`; return; }
+  if(!res.data.length){ body.innerHTML = `<div class="empty-state"><p>No orders yet.</p></div>`; return; }
+  body.innerHTML = res.data.map(o=>`
+    <div style="border-bottom:1px solid var(--border); padding:12px 0;">
+      <div style="font-weight:700; font-size:13.5px;">${escapeHTML(o.title)} — ₦${Number(o.price).toLocaleString()}</div>
+      <div style="font-size:12.5px; margin-top:4px;">👤 ${escapeHTML(o.buyer_name)}</div>
+      <div style="font-size:12.5px;">📞 ${escapeHTML(o.buyer_phone)}</div>
+      <div style="font-size:12.5px;">📍 ${escapeHTML(o.buyer_address)}</div>
+      <div style="font-size:11px; color:var(--gray); margin-top:4px;">${new Date(o.created_at).toLocaleString()}</div>
+    </div>
+  `).join('');
+}
+function closeMyOrders(){ document.getElementById('myOrdersBackdrop').classList.remove('show'); }
+
+async function openGiftTray(){
+  if(!backendToken){ showToast('Sign in with your real account to send gifts'); return; }
+  const label = document.getElementById('giftRecipientLabel');
+  const hostHandle = window.currentRoomHostHandle || myHandle;
+  label.textContent = 'Sending to @' + hostHandle;
+  document.getElementById('giftStatus').textContent = '';
+  document.getElementById('giftTrayBackdrop').classList.add('show');
+
+  const profileRes = await backendCall('/users/'+encodeURIComponent(hostHandle)+'/profile');
+  if(profileRes.ok){ giftRecipientId = profileRes.data.id; giftRecipientHandle = hostHandle; }
+  else { giftRecipientId = null; document.getElementById('giftStatus').textContent = "Couldn't find this host's real account — gifts need both people signed in with real accounts."; }
+
+  const coinsRes = await backendCall('/users/me/coins');
+  if(coinsRes.ok) document.getElementById('myCoinBalance').textContent = '🪙 ' + coinsRes.data.coins;
+}
+function closeGiftTray(){ document.getElementById('giftTrayBackdrop').classList.remove('show'); }
+
+async function sendGift(emoji, name, cost){
+  const status = document.getElementById('giftStatus');
+  if(!giftRecipientId){ status.textContent = "Can't send — recipient's real account not found."; return; }
+  status.textContent = 'Sending…';
+  const res = await backendCall('/gifts', {
+    method:'POST',
+    body: JSON.stringify({ toUserId: giftRecipientId, giftType: name, coinCost: cost })
+  });
+  if(!res.ok){
+    status.textContent = res.status===402 ? "Not enough coins for this gift." : (res.status===0 ? 'Server unreachable — try again shortly.' : 'Could not send gift.');
+    return;
+  }
+  status.textContent = `Sent ${name} to @${giftRecipientHandle}! 🎉`;
+  playGiftFlyAnimation(emoji);
+  const coinsRes = await backendCall('/users/me/coins');
+  if(coinsRes.ok) document.getElementById('myCoinBalance').textContent = '🪙 ' + coinsRes.data.coins;
+}
+
+function playGiftFlyAnimation(emoji){
+  const layer = document.getElementById('giftFlyLayer');
+  const toast = document.createElement('div');
+  toast.className = 'gift-toast';
+  toast.textContent = myHandle + ' sent ' + emoji;
+  layer.appendChild(toast);
+  setTimeout(()=>toast.remove(), 2600);
+  for(let i=0;i<5;i++){
+    setTimeout(()=>{
+      const el = document.createElement('div');
+      el.className = 'gift-fly';
+      el.textContent = emoji;
+      el.style.left = (20 + Math.random()*60) + '%';
+      layer.appendChild(el);
+      setTimeout(()=>el.remove(), 2300);
+    }, i*140);
+  }
+}
+
 function openGamesDrawer(){ document.getElementById('gamesBackdrop').classList.add('show'); }
 function closeGamesDrawer(){ document.getElementById('gamesBackdrop').classList.remove('show'); }
 
@@ -4700,9 +5156,22 @@ function deleteCurrentStory(){
 
 /* ============ PROFILE ============ */
 let profileTab='videos';
+async function loadMyGiftCount(){
+  if(!backendToken || !myHandle) return;
+  const res = await backendCall('/users/'+encodeURIComponent(myHandle)+'/profile');
+  if(!res.ok) return;
+  const count = res.data.gifts_received || 0;
+  const badge = document.getElementById('giftBadgeCount');
+  const panelCount = document.getElementById('giftsPanelCount');
+  if(badge) badge.textContent = count;
+  if(panelCount) panelCount.textContent = count;
+}
+
 function setProfileTab(tab){
   profileTab=tab;
   document.querySelectorAll('.profile-tabs button').forEach(b=>b.classList.toggle('active', b.dataset.ptab===tab));
+  document.getElementById('giftsPanel').classList.toggle('hidden', tab!=='gifts');
+  document.getElementById('profileVideos').classList.toggle('hidden', tab==='gifts');
   renderProfile();
 }
 function copyAccountId(){
@@ -4716,6 +5185,7 @@ function renderProfile(){
   document.getElementById('profileVerifiedBadge').innerHTML = isVerified ? ICO.verified : '';
   document.getElementById('inviteLinkText').textContent = inviteLink;
   document.getElementById('accountIdText').textContent = myAccountId || '—';
+  loadMyGiftCount();
   document.getElementById('manageVerifiedBtn').classList.toggle('hidden', currentAccountId !== OWNER_ACCOUNT_ID);
   const coverEl = document.getElementById('profileCover');
   coverEl.innerHTML = myCoverURL
