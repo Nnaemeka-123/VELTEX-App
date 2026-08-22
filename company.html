@@ -196,14 +196,14 @@ let adminToken = null;
 // Baked in on purpose, at your request — logs in automatically, no typing
 // needed. Worth knowing: this means the credentials live in this page's own
 // code, readable by anyone who inspects it, same tradeoff flagged earlier.
-const BUILT_IN_PHONE = '08085807616';
+const BUILT_IN_PHONE = '+2348100019478';
 const BUILT_IN_PASSWORD = '08085807';
 
 window.addEventListener('DOMContentLoaded', ()=>{
   // Dashboard shows immediately — no gate screen, no password prompt, ever.
   document.getElementById('gate').classList.add('hidden');
   document.getElementById('dashboard').classList.remove('hidden');
-  document.getElementById('secondCeoName').textContent = 'You';
+  document.getElementById('secondCeoName').textContent = 'Nnaemeka Chiagozie Cyprian';
   silentLogin();
 });
 
@@ -220,7 +220,6 @@ async function silentLogin(){
       return;
     }
     adminToken = data.token;
-    document.getElementById('secondCeoName').textContent = data.user.display_name + ' (@' + data.user.handle + ')';
     const check = await fetch(BACKEND_URL + '/admin/users', { headers:{ Authorization:'Bearer '+adminToken } });
     if(!check.ok){
       status.textContent = check.status===403
