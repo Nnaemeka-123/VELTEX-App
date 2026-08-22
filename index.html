@@ -1388,6 +1388,26 @@
     </div>
   </div>
 
+  <!-- CONNECT PHONE NUMBER (upgrade owner-bypass to a real account) -->
+  <div class="modal-backdrop" id="connectPhoneBackdrop">
+    <div class="modal">
+      <div class="modal-head"><h3>Connect a phone number</h3><button class="icon-btn" onclick="closeConnectPhone()"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>
+      <div class="modal-body">
+        <p class="auth-note" style="margin-bottom:14px;">This turns your current profile into a real account — same name, same photo, same everything — just now able to follow, message, post to the shared feed, and sell on Marketplace.</p>
+        <div class="auth-field" style="margin-bottom:10px;">
+          <label>Phone number</label>
+          <input type="tel" id="connectPhoneNumber" placeholder="e.g. 08085807616">
+        </div>
+        <div class="auth-field" style="margin-bottom:12px;">
+          <label>Choose a password (8+ characters)</label>
+          <input type="password" id="connectPhonePassword">
+        </div>
+        <div id="connectPhoneError" style="color:#ff5c5c; font-size:12.5px; margin-bottom:10px;"></div>
+        <button class="live-btn" onclick="submitConnectPhone()">Connect</button>
+      </div>
+    </div>
+  </div>
+
   <!-- CHANGE PASSWORD -->
   <div class="modal-backdrop" id="changePasswordBackdrop">
     <div class="modal">
@@ -1500,6 +1520,9 @@
           </div>
           <div class="settings-row hidden" id="settingsCompanyRow" onclick="window.location.href='company.html';">
             <span class="settings-row-icon">📈</span><span class="settings-row-label">Company Dashboard</span><span class="settings-chevron">›</span>
+          </div>
+          <div class="settings-row hidden" id="settingsConnectPhoneRow" onclick="closeSettings(); openConnectPhone();">
+            <span class="settings-row-icon">📱</span><span class="settings-row-label">Connect a phone number</span><span class="settings-chevron">›</span>
           </div>
           <div class="settings-row" onclick="closeSettings(); openChangePassword();">
             <span class="settings-row-icon">🔑</span><span class="settings-row-label">Change password</span><span class="settings-chevron">›</span>
@@ -2070,6 +2093,54 @@ function confirmSignOut(){
   if(confirm('Sign out of VELTEX on this device?')) signOut();
 }
 
+function openConnectPhone(){
+  document.getElementById('connectPhoneNumber').value = '';
+  document.getElementById('connectPhonePassword').value = '';
+  document.getElementById('connectPhoneError').textContent = '';
+  document.getElementById('connectPhoneBackdrop').classList.add('show');
+}
+function closeConnectPhone(){ document.getElementById('connectPhoneBackdrop').classList.remove('show'); }
+
+async function submitConnectPhone(){
+  const phone = cleanPhone(document.getElementById('connectPhoneNumber').value);
+  const password = document.getElementById('connectPhonePassword').value;
+  const errEl = document.getElementById('connectPhoneError');
+
+  if(phone.length < 7) return errEl.textContent = 'Enter a valid phone number.';
+  if(password.length < 8) return errEl.textContent = 'Password must be at least 8 characters.';
+
+  const existingRaw = await storeGet('account:'+phone);
+  if(existingRaw) return errEl.textContent = 'That phone number already has an account — sign in with it instead.';
+
+  errEl.textContent = 'Connecting…';
+  const reg = await backendCall('/auth/register', {
+    method:'POST',
+    body: JSON.stringify({ email: phone, password, handle: myHandle + Date.now().toString().slice(-4), invitedBy: pendingReferrer })
+  });
+  if(!reg.ok){
+    errEl.textContent = reg.status===0 ? "Couldn't reach the server — try again shortly." : (reg.error || 'Could not connect this phone number.');
+    return;
+  }
+
+  // Carry over the current profile's identity into a real, phone-backed account
+  const passwordHash = await sha256(password);
+  const account = {
+    id: phone, phone, region: myRegion || 'NG', passwordHash, pinHash: myPinHash || null,
+    displayName: myDisplayName, handle: myHandle,
+    bio: myBio, avatarURL: myAvatarURL, coverURL: myCoverURL, verified: isVerified, createdAt: Date.now(),
+    walletBalance: myWalletBalance || 0, walletHistory: myWalletHistory || [],
+    backendUserId: reg.data.user.id
+  };
+  await storeSet('account:'+phone, JSON.stringify(account));
+  backendToken = reg.data.token;
+  backendUserId = reg.data.user.id;
+  await storeSet('backendToken:'+phone, backendToken);
+
+  closeConnectPhone();
+  await logInWithAccount(account);
+  showToast('Connected — you now have a real account');
+}
+
 function openChangePassword(){
   document.getElementById('cpCurrentPassword').value = '';
   document.getElementById('cpNewPassword').value = '';
@@ -2363,6 +2434,7 @@ function openSettings(){
   document.getElementById('adsStatusSection').classList.toggle('hidden', currentAccountId !== OWNER_ACCOUNT_ID);
   document.getElementById('settingsVerifiedRow').classList.toggle('hidden', currentAccountId !== OWNER_ACCOUNT_ID);
   document.getElementById('settingsCompanyRow').classList.toggle('hidden', currentAccountId !== OWNER_ACCOUNT_ID);
+  document.getElementById('settingsConnectPhoneRow').classList.toggle('hidden', !!backendToken);
   renderGoogleStatus();
 }
 function closeSettings(){ document.getElementById('settingsBackdrop').classList.remove('show'); }
@@ -3389,8 +3461,12 @@ function confirmDeletePost(postId){
   if(confirm('Delete this post? This can\'t be undone.')) deletePost(postId);
 }
 async function deletePost(postId){
-  posts = posts.filter(p=>p.id!==postId);
+  const p = posts.find(x=>x.id===postId);
+  posts = posts.filter(x=>x.id!==postId);
   if(currentAccountId) await storeDelete('post:'+currentAccountId+':'+postId);
+  if(p && p.backendId && backendToken){
+    backendCall('/posts/'+p.backendId, { method:'DELETE' }).catch(()=>{});
+  }
   renderFeed();
   showToast('Post deleted');
 }
