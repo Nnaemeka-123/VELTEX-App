@@ -131,6 +131,20 @@
       <div class="chart-empty hidden" id="chartEmpty">No signups in the last 7 days yet</div>
     </div>
 
+    <div class="section-title">📈 Platform Revenue (real)</div>
+    <div class="stat-grid">
+      <div class="stat-box"><div class="stat-num" id="revenueTodayStat">—</div><div class="stat-label">Today</div></div>
+      <div class="stat-box"><div class="stat-num" id="revenueTotalStat">—</div><div class="stat-label">All-time</div></div>
+    </div>
+    <div class="balance-note" style="margin-bottom:6px;">Real, automatic — VELTEX keeps 30% of every gift sent between users, tracked live, no ad network needed.</div>
+
+    <div class="section-title">🪙 VELTEX Balance (real)</div>
+    <div class="stat-grid">
+      <div class="stat-box"><div class="stat-num" id="myCoinsStat">—</div><div class="stat-label">Coins</div></div>
+      <div class="stat-box"><div class="stat-num" id="myEarningsStat">—</div><div class="stat-label">Earnings (from gifts)</div></div>
+    </div>
+    <div class="balance-note" style="margin-bottom:6px;">This one's real, pulled directly from your actual account on the server — earnings grow whenever anyone sends you a gift on Live.</div>
+
     <div class="section-title">💰 Ad Earnings</div>
     <div class="control-card">
       <div class="control-label" style="margin-bottom:4px;">Adsterra balance</div>
@@ -158,6 +172,20 @@
       <div id="broadcastStatus" class="balance-note"></div>
     </div>
 
+    <div class="section-title">💬 Chat with a user</div>
+    <div class="control-card">
+      <input type="text" class="balance-input" id="chatHandleInput" placeholder="Their @handle" style="font-size:14px; margin-bottom:8px;">
+      <button class="control-btn" style="width:100%; padding:10px;" onclick="openCompanyChat()">Open chat</button>
+      <div id="companyChatThread" class="hidden" style="margin-top:12px;">
+        <div id="companyChatMessages" style="max-height:220px; overflow-y:auto; margin-bottom:8px;"></div>
+        <div style="display:flex; gap:6px;">
+          <input type="text" class="balance-input" id="companyChatInput" style="font-size:13px; margin:0;" placeholder="Message…">
+          <button class="control-btn" onclick="sendCompanyChat()">Send</button>
+        </div>
+      </div>
+      <div id="chatStatus" class="balance-note"></div>
+    </div>
+
     <div id="statusMsg" style="font-size:11px; color:#5c9c82; margin-top:16px; font-family:'Space Mono',monospace;"></div>
   </div>
 
@@ -172,39 +200,41 @@ const BUILT_IN_PHONE = '08085807616';
 const BUILT_IN_PASSWORD = '08085807';
 
 window.addEventListener('DOMContentLoaded', ()=>{
-  document.getElementById('gateEmail').value = BUILT_IN_PHONE;
-  document.getElementById('gatePassword').value = BUILT_IN_PASSWORD;
-  attemptLogin();
+  // Dashboard shows immediately — no gate screen, no password prompt, ever.
+  document.getElementById('gate').classList.add('hidden');
+  document.getElementById('dashboard').classList.remove('hidden');
+  document.getElementById('secondCeoName').textContent = 'You';
+  silentLogin();
 });
 
-async function attemptLogin(){
-  const email = document.getElementById('gateEmail').value.trim();
-  const password = document.getElementById('gatePassword').value;
-  const errEl = document.getElementById('gateError');
-  errEl.textContent = 'Checking…';
+async function silentLogin(){
+  const status = document.getElementById('statusMsg');
   try{
     const res = await fetch(BACKEND_URL + '/auth/login', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ email, password })
+      body: JSON.stringify({ email: BUILT_IN_PHONE, password: BUILT_IN_PASSWORD })
     });
     const data = await res.json();
     if(!res.ok){
-      errEl.textContent = (data.error || 'Login failed') + ' — this exact phone number needs to be a real signed-up VELTEX account first.';
+      status.textContent = 'Live data unavailable right now (' + (data.error||'login failed') + '). Balance field below still works.';
       return;
     }
     adminToken = data.token;
-    // Confirm this account is actually the real admin by testing an admin-only route
-    const check = await fetch(BACKEND_URL + '/admin/users', { headers:{ Authorization:'Bearer '+adminToken } });
-    if(check.status === 403){ errEl.textContent = 'This account is not authorized as the company admin.'; return; }
-    if(!check.ok){ errEl.textContent = 'Could not verify admin access — try again shortly.'; return; }
     document.getElementById('secondCeoName').textContent = data.user.display_name + ' (@' + data.user.handle + ')';
-    document.getElementById('gate').classList.add('hidden');
-    document.getElementById('dashboard').classList.remove('hidden');
-    loadBalance();
+    const check = await fetch(BACKEND_URL + '/admin/users', { headers:{ Authorization:'Bearer '+adminToken } });
+    if(!check.ok){
+      status.textContent = check.status===403
+        ? 'This account is not set as admin yet — add ADMIN_EMAIL in Render to unlock live stats and broadcasts.'
+        : 'Could not load live stats right now — try refreshing shortly.';
+      return;
+    }
     loadStats();
+    loadMyBalance();
+    loadRevenue();
     loadGrowthChart();
+    loadBalance();
   }catch(e){
-    errEl.textContent = 'Could not reach the server — it may be waking up (free tier), try again in a minute.';
+    status.textContent = "Couldn't reach the server — it may be waking up (free tier), refresh in a minute.";
   }
 }
 
@@ -248,6 +278,79 @@ async function loadGrowthChart(){
     ctx.fillText(r.day.slice(5), i*barW + barW*0.15, h - 4);
     ctx.fillStyle = '#00ff8c';
   });
+}
+
+async function loadRevenue(){
+  try{
+    const res = await fetch(BACKEND_URL + '/admin/revenue', { headers:{ Authorization:'Bearer '+adminToken } });
+    const data = await res.json();
+    if(res.ok){
+      document.getElementById('revenueTodayStat').textContent = '🪙' + data.todayCoins;
+      document.getElementById('revenueTotalStat').textContent = '🪙' + data.totalCoins;
+    }
+  }catch(e){}
+}
+
+async function loadMyBalance(){
+  try{
+    const res = await fetch(BACKEND_URL + '/users/me/coins', { headers:{ Authorization:'Bearer '+adminToken } });
+    const data = await res.json();
+    if(res.ok){
+      document.getElementById('myCoinsStat').textContent = data.coins;
+      document.getElementById('myEarningsStat').textContent = data.earnings_balance;
+    }
+  }catch(e){}
+}
+
+let companyChatUserId = null;
+async function openCompanyChat(){
+  const handle = document.getElementById('chatHandleInput').value.trim().replace('@','');
+  const status = document.getElementById('chatStatus');
+  if(!handle){ status.textContent = 'Enter a handle first.'; return; }
+  status.textContent = 'Looking up @'+handle+'…';
+  try{
+    const profRes = await fetch(BACKEND_URL + '/users/' + encodeURIComponent(handle) + '/profile');
+    const profile = await profRes.json();
+    if(!profRes.ok){ status.textContent = "Couldn't find that user."; return; }
+    companyChatUserId = profile.id;
+    status.textContent = '';
+    document.getElementById('companyChatThread').classList.remove('hidden');
+    await loadCompanyChatMessages();
+  }catch(e){
+    status.textContent = 'Server unreachable — try again shortly.';
+  }
+}
+
+async function loadCompanyChatMessages(){
+  const el = document.getElementById('companyChatMessages');
+  el.innerHTML = 'Loading…';
+  try{
+    const res = await fetch(BACKEND_URL + '/messages/' + companyChatUserId, { headers:{ Authorization:'Bearer '+adminToken } });
+    const data = await res.json();
+    if(!res.ok){ el.innerHTML = "Couldn't load messages."; return; }
+    if(!data.length){ el.innerHTML = 'No messages yet — say hi.'; return; }
+    el.innerHTML = data.map(m=>`<div style="font-size:12.5px; margin-bottom:6px; padding:6px 10px; border-radius:8px; background:rgba(0,255,140,.06);">${m.text}</div>`).join('');
+    el.scrollTop = el.scrollHeight;
+  }catch(e){
+    el.innerHTML = 'Server unreachable.';
+  }
+}
+
+async function sendCompanyChat(){
+  const input = document.getElementById('companyChatInput');
+  const text = input.value.trim();
+  if(!text || !companyChatUserId) return;
+  input.value = '';
+  try{
+    await fetch(BACKEND_URL + '/messages', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', Authorization:'Bearer '+adminToken },
+      body: JSON.stringify({ toUserId: companyChatUserId, text })
+    });
+    await loadCompanyChatMessages();
+  }catch(e){
+    document.getElementById('chatStatus').textContent = 'Could not send — try again shortly.';
+  }
 }
 
 async function sendBroadcast(){
