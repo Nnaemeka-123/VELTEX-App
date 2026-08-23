@@ -2558,23 +2558,29 @@ function renderGoogleStatus(){
   const signInReady = !GOOGLE_CLIENT_ID.includes('REPLACE');
   const adsReady = !ADSENSE_PUBLISHER_ID.includes('REPLACE') && !ADSENSE_AD_SLOT.includes('REPLACE');
   const adsterraReady = !ADSTERRA_BANNER_KEY.includes('REPLACE');
-  document.getElementById('googleStatusList').innerHTML = `
+  const propellerReady = !PROPELLERADS_ZONE_ID.includes('REPLACE');
+  const smartlinkReady = !MONETAG_SMARTLINK.includes('REPLACE');
+  const bitmediaReady = document.querySelector('meta[name="bitmedia-site-verification"]') !== null;
+  const monetagReady = document.querySelector('meta[name="monetag"]') !== null;
+  const gscReady = document.querySelector('meta[name="google-site-verification"]') !== null;
+
+  const row = (icon, label, ready, readyLabel, notReadyLabel) => `
     <div class="settings-row">
-      <span class="settings-row-icon">🔑</span>
-      <span class="settings-row-label">Google Sign-In</span>
-      <span style="font-size:12px; font-weight:700; color:${signInReady?'#5fe07a':'var(--gray)'};">${signInReady?'Connected':'Not set up'}</span>
-    </div>
-    <div class="settings-row">
-      <span class="settings-row-icon">📢</span>
-      <span class="settings-row-label">AdSense</span>
-      <span style="font-size:12px; font-weight:700; color:${adsReady?'#5fe07a':'var(--gray)'};">${adsReady?'Connected':'Not set up'}</span>
-    </div>
-    <div class="settings-row">
-      <span class="settings-row-icon">📣</span>
-      <span class="settings-row-label">Adsterra</span>
-      <span style="font-size:12px; font-weight:700; color:${adsterraReady?'#5fe07a':'var(--gray)'};">${adsterraReady?'Connected':'Not set up'}</span>
+      <span class="settings-row-icon">${icon}</span>
+      <span class="settings-row-label">${label}</span>
+      <span style="font-size:12px; font-weight:700; color:${ready?'#5fe07a':'var(--gray)'};">${ready?(readyLabel||'Connected'):(notReadyLabel||'Not set up')}</span>
     </div>
   `;
+
+  document.getElementById('googleStatusList').innerHTML =
+    row('🔑','Google Sign-In', signInReady) +
+    row('🔍','Google Search Console', gscReady, 'Verified', 'Not verified') +
+    row('📢','AdSense', adsReady) +
+    row('📣','Adsterra', adsterraReady) +
+    row('🎰','PropellerAds', propellerReady) +
+    row('🔗','Monetag SmartLinks', smartlinkReady) +
+    row('✅','Monetag site verification', monetagReady, 'Verified', 'Not verified') +
+    row('₿','Bitmedia site verification', bitmediaReady, 'Verified', 'Not verified');
 }
 
 /* ============ NOTIFICATIONS ============
