@@ -18,6 +18,8 @@
 <meta name="theme-color" content="#000000">
 <meta name="google-adsense-account" content="ca-pub-3554681097005105">
 <meta name="bitmedia-site-verification" content="f6504e22d7cf7596fa32b516dd66a9a2" />
+<meta name="monetag" content="0fdef46b49661e00ce20ebed489934b9">
+<meta name="google-site-verification" content="OORYdM2Ct7JHKP3vcI-bSEJIrEA5fSvlz1noSKUipyU" />
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -729,9 +731,35 @@
     display:inline-block; margin-top:3px; font-size:10.5px; font-weight:700; color:var(--cyan);
     background:rgba(37,244,238,.12); padding:2px 8px; border-radius:8px;
   }
+  .chat-fullscreen{
+    position:absolute; inset:0; z-index:65; background:#000; display:flex; flex-direction:column;
+  }
+  .chat-fullscreen.hidden{display:none;}
+  .chat-header{
+    display:flex; align-items:center; justify-content:space-between; padding:14px 16px;
+    border-bottom:1px solid var(--border); flex-shrink:0;
+  }
+  .chat-messages{flex:1; overflow-y:auto; padding:14px 16px;}
+  .chat-input-row{
+    display:flex; align-items:center; gap:10px; padding:10px 14px calc(10px + env(safe-area-inset-bottom));
+    border-top:1px solid var(--border); flex-shrink:0;
+  }
+  .chat-input-row input{
+    flex:1; background:var(--panel2); border:none; border-radius:22px; padding:11px 16px; color:#fff;
+    font-size:14px; outline:none;
+  }
+  .chat-input-row button{
+    background:var(--pink); border:none; width:40px; height:40px; border-radius:50%; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center; color:#fff;
+  }
+  .chat-input-row button svg{width:18px; height:18px;}
   .market-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
   .market-card{background:var(--panel); border-radius:12px; overflow:hidden; cursor:pointer;}
-  .market-card-img{width:100%; aspect-ratio:1; background:#111; display:flex; align-items:center; justify-content:center; font-size:32px; color:var(--gray);}
+  .market-card-img{width:100%; aspect-ratio:1; background:#111; display:flex; align-items:center; justify-content:center; font-size:32px; color:var(--gray); position:relative;}
+  .market-boost-badge{
+    position:absolute; top:6px; left:6px; background:var(--pink); color:#fff; font-size:10px; font-weight:800;
+    padding:3px 8px; border-radius:10px;
+  }
   .market-card-img img{width:100%; height:100%; object-fit:cover;}
   .market-card-info{padding:8px 10px;}
   .market-card-title{font-size:12.5px; font-weight:700; line-height:1.3; margin-bottom:3px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;}
@@ -1379,16 +1407,18 @@
   </div>
 
   <!-- DM CONVERSATION -->
-  <div class="modal-backdrop" id="conversationBackdrop">
-    <div class="modal">
-      <div class="modal-head"><h3 id="convTitle">Messages</h3><button class="icon-btn" onclick="closeConversation()"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>
-      <div class="modal-body">
-        <div id="convMessages" style="max-height:340px; overflow-y:auto; margin-bottom:12px;"></div>
-        <div style="display:flex; gap:8px;">
-          <input type="text" id="convInput" placeholder="Message…" style="flex:1;" onkeydown="if(event.key==='Enter')sendConversationMessage();">
-          <button class="live-btn" style="width:auto; padding:10px 16px;" onclick="sendConversationMessage()">Send</button>
-        </div>
-      </div>
+  <div class="chat-fullscreen hidden" id="conversationBackdrop">
+    <div class="chat-header">
+      <button class="icon-btn" onclick="closeConversation()"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg></button>
+      <div id="convTitle" style="font-weight:700; font-size:15px;">Messages</div>
+      <div style="width:22px;"></div>
+    </div>
+    <div id="convMessages" class="chat-messages"></div>
+    <div class="chat-input-row">
+      <input type="text" id="convInput" placeholder="Message…" onkeydown="if(event.key==='Enter')sendConversationMessage();">
+      <button onclick="sendConversationMessage()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+      </button>
     </div>
   </div>
 
@@ -1753,6 +1783,30 @@ const ADSENSE_AD_SLOT = '3989872547';
    > Ad units > Banner) and paste it in below.
 ============================================================================ */
 const ADSTERRA_BANNER_KEY = 'aa16875316f35a374c07cd367bc85084';
+
+/* ============================================================================
+   PROPELLERADS
+   ----------------------------------------------------------------------------
+   A third real ad network, same honest pattern as the others: this slot
+   stays inactive until a real zone ID replaces the placeholder below. No
+   minimum traffic requirement and fast approval, so it's realistic to add
+   even at this early stage — get your zone ID from your PropellerAds
+   dashboard (Sites > your site > Zones > Banner) and paste it in below.
+============================================================================ */
+const PROPELLERADS_ZONE_ID = 'REPLACE_WITH_YOUR_PROPELLERADS_ZONE_ID';
+
+/* ============================================================================
+   MONETAG SMARTLINK
+   ----------------------------------------------------------------------------
+   A different ad format from the others: not an embedded banner, but a link
+   that shows a real ad page when someone taps it, paying per interaction.
+   Deliberately shown as a clearly-labeled, tap-to-open sponsored card —
+   never auto-opened or redirected without the person choosing to tap it,
+   since that kind of thing violates ad-network policy and just annoys
+   real users.
+============================================================================ */
+const MONETAG_SMARTLINK = 'https://omg10.com/4/11635468';
+const MONETAG_SMARTLINK_2 = 'https://omg10.com/4/11635488';
 const CURRENCY_BY_REGION = { nigeria:'₦', eu:'€', americas:'$', asia:'$', africa:'$' };
 
 let authMode = 'signin'; // 'signin' | 'signup'
@@ -3038,15 +3092,47 @@ function buildFeedAdCard(idx){
   el.className = 'post feed-ad-card';
   const adsReady = !ADSENSE_PUBLISHER_ID.includes('REPLACE') && !ADSENSE_AD_SLOT.includes('REPLACE');
   const adsterraReady = !ADSTERRA_BANNER_KEY.includes('REPLACE');
+  const propellerReady = !PROPELLERADS_ZONE_ID.includes('REPLACE');
 
-  if(!adsReady && !adsterraReady){
+  if(!adsReady && !adsterraReady && !propellerReady){
     el.classList.add('hidden');
     return el;
   }
 
-  // Alternate between AdSense and Adsterra on different ad slots, so neither
-  // network gets hammered with repeated requests on the same scroll
-  const useAdsterra = adsterraReady && (idx % 10 === 5 || !adsReady);
+  // Rotate between all connected networks so none gets hammered with
+  // repeated requests on the same scroll
+  const slot4 = idx % 20;
+  const useSmartlink = !MONETAG_SMARTLINK.includes('REPLACE') && slot4 === 15;
+  const slot3 = idx % 15;
+  const usePropeller = !useSmartlink && propellerReady && slot3 === 10;
+  const useAdsterra = !useSmartlink && !usePropeller && adsterraReady && (idx % 10 === 5 || (!adsReady && !propellerReady));
+
+  if(useSmartlink){
+    const link = (idx % 40 < 20) ? MONETAG_SMARTLINK : MONETAG_SMARTLINK_2;
+    el.innerHTML = `
+      <div class="feed-ad-label">Sponsored</div>
+      <div class="feed-ad-inner" style="flex-direction:column; gap:14px;">
+        <div style="font-size:15px; font-weight:700; text-align:center; padding:0 20px;">Tap to continue</div>
+        <button class="live-btn" style="width:auto; padding:12px 28px;" onclick="window.open('${link}','_blank')">Continue</button>
+      </div>
+    `;
+    return el;
+  }
+
+  if(usePropeller){
+    el.innerHTML = `
+      <div class="feed-ad-label">Sponsored</div>
+      <div class="feed-ad-inner" id="feedPropeller-${idx}" style="display:flex; align-items:center; justify-content:center;"></div>
+    `;
+    // NOTE: PropellerAds gives you the exact embed snippet in your own
+    // dashboard when you create the zone — paste that exact code here once
+    // you have it, rather than relying on a guessed URL pattern.
+    setTimeout(()=>{
+      const slot = document.getElementById('feedPropeller-'+idx);
+      if(slot) slot.innerHTML = '<!-- Paste your real PropellerAds zone snippet here -->';
+    }, 0);
+    return el;
+  }
 
   if(useAdsterra){
     el.innerHTML = `
@@ -3833,10 +3919,10 @@ async function openConversation(userId, handle, displayName){
   if(!backendToken){ showToast('Sign in again to message people — your session expired'); return; }
   currentConversationUserId = userId;
   document.getElementById('convTitle').textContent = 'Chat with '+displayName;
-  document.getElementById('conversationBackdrop').classList.add('show');
+  document.getElementById('conversationBackdrop').classList.remove('hidden');
   await loadConversation();
 }
-function closeConversation(){ document.getElementById('conversationBackdrop').classList.remove('show'); currentConversationUserId = null; }
+function closeConversation(){ document.getElementById('conversationBackdrop').classList.add('hidden'); currentConversationUserId = null; }
 
 async function loadConversation(){
   const el = document.getElementById('convMessages');
@@ -4313,10 +4399,10 @@ async function checkLiveEligibility(){
     showLiveError(res.status===0 ? "Couldn't reach the server — try again in a minute." : "Couldn't check your eligibility right now.");
     return false;
   }
-  const { eligible, followerCount, likeCount, verified, required } = res.data;
+  const { eligible, followerCount, likeCount, verified, requiredFollowers, requiredLikes } = res.data;
   if(eligible) return true;
   if(verified) return true;
-  showLiveError(`You need ${required} followers and ${required} likes to go live (or be verified). You currently have ${followerCount} followers and ${likeCount} likes.`);
+  showLiveError(`You need ${requiredFollowers} followers and ${requiredLikes} likes to go live (or be verified). You currently have ${followerCount} followers and ${likeCount} likes.`);
   return false;
 }
 
@@ -4790,16 +4876,18 @@ async function loadMarketListings(){
     return;
   }
   window.__marketListings = res.data;
-  grid.innerHTML = res.data.map(l=>`
+  grid.innerHTML = res.data.map(l=>{
+    const isBoosted = l.boosted_until && new Date(l.boosted_until) > new Date();
+    return `
     <div class="market-card" onclick="openListingDetail('${l.id}')">
-      <div class="market-card-img">${l.image_data ? `<img src="${l.image_data}">` : '🛍️'}</div>
+      <div class="market-card-img">${l.image_data ? `<img src="${l.image_data}">` : '🛍️'}${isBoosted ? '<div class="market-boost-badge">🚀 Boosted</div>' : ''}</div>
       <div class="market-card-info">
         <div class="market-card-title">${escapeHTML(l.title)}</div>
         <div class="market-card-price">${l.currency==='NGN'?'₦':l.currency}${Number(l.price).toLocaleString()}</div>
         <div class="market-card-seller">@${escapeHTML(l.handle)}${l.verified?' '+ICO.verified:''}</div>
       </div>
     </div>
-  `).join('');
+  `;}).join('');
 }
 
 function openCreateListing(){
@@ -4853,6 +4941,8 @@ function openListingDetail(id){
   const l = (window.__marketListings||[]).find(x=>x.id===id);
   if(!l) return;
   const body = document.getElementById('listingDetailBody');
+  const isMine = l.handle === myHandle;
+  const isBoosted = l.boosted_until && new Date(l.boosted_until) > new Date();
   body.innerHTML = `
     ${l.image_data ? `<img src="${l.image_data}" style="width:100%; border-radius:10px; margin-bottom:12px;">` : ''}
     <div style="font-weight:800; font-size:16px; margin-bottom:4px;">${escapeHTML(l.title)}</div>
@@ -4860,16 +4950,34 @@ function openListingDetail(id){
     ${l.description ? `<div style="font-size:13px; margin-bottom:10px;">${escapeHTML(l.description)}</div>` : ''}
     ${l.product_link ? `<a href="${escapeHTML(l.product_link)}" target="_blank" style="font-size:12.5px; color:var(--cyan); word-break:break-all;">${escapeHTML(l.product_link)}</a>` : ''}
     <div style="font-size:12px; color:var(--gray); margin:12px 0;">Sold by @${escapeHTML(l.handle)}${l.verified?' '+ICO.verified:''}</div>
-    <div class="auth-field" style="margin-bottom:8px;"><label>Your full name</label><input type="text" id="buyerName"></div>
-    <div class="auth-field" style="margin-bottom:8px;"><label>Your phone number</label><input type="tel" id="buyerPhone"></div>
-    <div class="auth-field" style="margin-bottom:10px;"><label>Delivery address</label><input type="text" id="buyerAddress"></div>
-    <div id="orderError" style="color:#ff5c5c; font-size:12.5px; margin-bottom:10px;"></div>
-    <button class="live-btn" onclick="submitOrder('${l.id}')">Order — pay seller directly</button>
-    <div class="auth-note" style="margin-top:10px;">VELTEX doesn't process this payment — you'll pay the seller directly using the details they share after ordering. Only buy from sellers you trust.</div>
+    ${isMine ? `
+      <button class="live-btn" style="background:var(--panel2); color:#fff; margin-bottom:12px;" onclick="boostListing('${l.id}')" ${isBoosted?'disabled':''}>
+        ${isBoosted ? '🚀 Already boosted (24h)' : '🚀 Boost this listing — 🪙 100, featured for 24h'}
+      </button>
+    ` : `
+      <div class="auth-field" style="margin-bottom:8px;"><label>Your full name</label><input type="text" id="buyerName"></div>
+      <div class="auth-field" style="margin-bottom:8px;"><label>Your phone number</label><input type="tel" id="buyerPhone"></div>
+      <div class="auth-field" style="margin-bottom:10px;"><label>Delivery address</label><input type="text" id="buyerAddress"></div>
+      <div id="orderError" style="color:#ff5c5c; font-size:12.5px; margin-bottom:10px;"></div>
+      <button class="live-btn" onclick="submitOrder('${l.id}')">Order — pay seller directly</button>
+      <div class="auth-note" style="margin-top:10px;">VELTEX doesn't process this payment — you'll pay the seller directly using the details they share after ordering. Only buy from sellers you trust.</div>
+    `}
   `;
   document.getElementById('listingDetailBackdrop').classList.add('show');
 }
 function closeListingDetail(){ document.getElementById('listingDetailBackdrop').classList.remove('show'); }
+
+async function boostListing(id){
+  if(!backendToken){ showToast('Sign in with your real account'); return; }
+  const res = await backendCall('/marketplace/listings/'+id+'/boost', { method:'POST' });
+  if(!res.ok){
+    showToast(res.status===402 ? "Not enough coins — boosting costs 🪙 100" : (res.status===0 ? 'Server unreachable — try again shortly' : 'Could not boost this listing'));
+    return;
+  }
+  showToast('Listing boosted for 24 hours! 🚀');
+  closeListingDetail();
+  loadMarketListings();
+}
 
 async function submitOrder(listingId){
   if(!backendToken){ showToast('Sign in with your real account to order'); return; }
@@ -5369,12 +5477,13 @@ async function loadMyRank(){
   if(!backendToken || !myHandle) return;
   const res = await backendCall('/users/'+encodeURIComponent(myHandle)+'/profile');
   const tag = document.getElementById('myRankTag');
-  if(!tag) return;
-  if(res.ok && res.data.rank){
-    tag.textContent = res.data.rank;
-    tag.classList.remove('hidden');
-  } else {
-    tag.classList.add('hidden');
+  if(tag){
+    if(res.ok && res.data.rank){ tag.textContent = res.data.rank; tag.classList.remove('hidden'); }
+    else tag.classList.add('hidden');
+  }
+  if(res.ok){
+    document.getElementById('statFollowers').textContent = fmt(res.data.followers||0);
+    document.getElementById('statFollowing').textContent = fmt(res.data.following||0);
   }
 }
 
