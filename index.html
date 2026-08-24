@@ -2314,8 +2314,10 @@ async function checkExistingSession(){
           return;
         }
         await logInWithAccount(account);
-        if(account.phone && account.backendUserId){
-          const savedToken = await storeGet('backendToken:'+account.phone);
+        if(account.backendUserId){
+          const tokenKey = account.phone || currentAccountId;
+          let savedToken = await storeGet('backendToken:'+tokenKey);
+          if(!savedToken && currentAccountId !== tokenKey) savedToken = await storeGet('backendToken:'+currentAccountId);
           if(savedToken){ backendToken = savedToken; backendUserId = account.backendUserId; loadMyInvites(); }
         }
         renderStoriesBar();
@@ -4896,7 +4898,18 @@ async function loadMarketListings(){
   `;}).join('');
 }
 
-function openCreateListing(){
+async function openCreateListing(){
+  if(!backendToken && currentAccountId){
+    // Last-chance recovery — the token may exist in storage even if this
+    // session's in-memory variable is empty
+    const raw = await storeGet('account:'+currentAccountId);
+    if(raw){
+      const account = JSON.parse(raw);
+      const tokenKey = account.phone || currentAccountId;
+      const savedToken = await storeGet('backendToken:'+tokenKey) || await storeGet('backendToken:'+currentAccountId);
+      if(savedToken && account.backendUserId){ backendToken = savedToken; backendUserId = account.backendUserId; }
+    }
+  }
   if(!backendToken){ showToast('Sign in with your real account to post a listing'); return; }
   listingImageData = null;
   document.getElementById('listingImagePreviewWrap').innerHTML = '';
