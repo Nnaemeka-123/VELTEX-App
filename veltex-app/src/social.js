@@ -38,8 +38,10 @@ router.get('/users/me/live-eligibility', requireAuth, safe(async (req, res) => {
   const followerCount = parseInt(followers.rows[0].count, 10);
   const likeCount = parseInt(likes.rows[0].count, 10);
   const verified = u.rows[0]?.verified || false;
-  const eligible = verified || (followerCount >= 100 && likeCount >= 100);
-  res.json({ eligible, followerCount, likeCount, verified, required: 100 });
+  const REQUIRED_FOLLOWERS = 50;
+  const REQUIRED_LIKES = 100;
+  const eligible = verified || (followerCount >= REQUIRED_FOLLOWERS && likeCount >= REQUIRED_LIKES);
+  res.json({ eligible, followerCount, likeCount, verified, requiredFollowers: REQUIRED_FOLLOWERS, requiredLikes: REQUIRED_LIKES });
 }));
 
 router.post('/videos/:id/like', requireAuth, safe(async (req, res) => {
@@ -211,12 +213,35 @@ router.post('/marketplace/listings', requireAuth, safe(async (req, res) => {
   res.status(201).json(r.rows[0]);
 }));
 
+router.post('/marketplace/listings/:id/boost', requireAuth, safe(async (req, res) => {
+  const BOOST_COST = 100;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const listing = await client.query(`SELECT seller_id FROM marketplace_listings WHERE id = $1`, [req.params.id]);
+    if (!listing.rows.length) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Listing not found' }); }
+    if (listing.rows[0].seller_id !== req.user.sub) { await client.query('ROLLBACK'); return res.status(403).json({ error: 'Not your listing' }); }
+    const buyer = await client.query(`SELECT coins FROM users WHERE id = $1 FOR UPDATE`, [req.user.sub]);
+    if (buyer.rows[0].coins < BOOST_COST) { await client.query('ROLLBACK'); return res.status(402).json({ error: 'Not enough coins' }); }
+    await client.query(`UPDATE users SET coins = coins - $1 WHERE id = $2`, [BOOST_COST, req.user.sub]);
+    await client.query(`UPDATE marketplace_listings SET boosted_until = now() + interval '24 hours' WHERE id = $1`, [req.params.id]);
+    await client.query(`INSERT INTO platform_revenue (source, amount) VALUES ('boost', $1)`, [BOOST_COST]);
+    await client.query('COMMIT');
+    res.json({ ok: true, cost: BOOST_COST });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}));
+
 router.get('/marketplace/listings', safe(async (req, res) => {
   const r = await pool.query(
-    `SELECT l.id, l.title, l.description, l.product_link, l.image_data, l.price, l.currency, l.created_at,
+    `SELECT l.id, l.title, l.description, l.product_link, l.image_data, l.price, l.currency, l.created_at, l.boosted_until,
             u.handle, u.display_name, u.verified
      FROM marketplace_listings l JOIN users u ON u.id = l.seller_id
-     ORDER BY l.created_at DESC LIMIT 60`
+     ORDER BY (l.boosted_until IS NOT NULL AND l.boosted_until > now()) DESC, l.created_at DESC LIMIT 60`
   );
   res.json(r.rows);
 }));
