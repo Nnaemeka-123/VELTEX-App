@@ -1423,24 +1423,7 @@
   </div>
 
   <!-- CONNECT PHONE NUMBER (upgrade owner-bypass to a real account) -->
-  <div class="modal-backdrop" id="connectPhoneBackdrop">
-    <div class="modal">
-      <div class="modal-head"><h3>Connect a phone number</h3><button class="icon-btn" onclick="closeConnectPhone()"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>
-      <div class="modal-body">
-        <p class="auth-note" style="margin-bottom:14px;">This turns your current profile into a real account — same name, same photo, same everything — just now able to follow, message, post to the shared feed, and sell on Marketplace.</p>
-        <div class="auth-field" style="margin-bottom:10px;">
-          <label>Phone number</label>
-          <input type="tel" id="connectPhoneNumber" placeholder="e.g. 08085807616">
-        </div>
-        <div class="auth-field" style="margin-bottom:12px;">
-          <label>Choose a password (8+ characters)</label>
-          <input type="password" id="connectPhonePassword">
-        </div>
-        <div id="connectPhoneError" style="color:#ff5c5c; font-size:12.5px; margin-bottom:10px;"></div>
-        <button class="live-btn" onclick="submitConnectPhone()">Connect</button>
-      </div>
-    </div>
-  </div>
+
 
   <!-- CHANGE PASSWORD -->
   <div class="modal-backdrop" id="changePasswordBackdrop">
@@ -1554,9 +1537,6 @@
           </div>
           <div class="settings-row hidden" id="settingsCompanyRow" onclick="window.location.href='company.html';">
             <span class="settings-row-icon">📈</span><span class="settings-row-label">Company Dashboard</span><span class="settings-chevron">›</span>
-          </div>
-          <div class="settings-row hidden" id="settingsConnectPhoneRow" onclick="closeSettings(); openConnectPhone();">
-            <span class="settings-row-icon">📱</span><span class="settings-row-label">Connect a phone number</span><span class="settings-chevron">›</span>
           </div>
           <div class="settings-row" onclick="closeSettings(); openChangePassword();">
             <span class="settings-row-icon">🔑</span><span class="settings-row-label">Change password</span><span class="settings-chevron">›</span>
@@ -2142,33 +2122,55 @@ function isOwnerSession(){
   return currentAccountId === OWNER_ACCOUNT_ID || currentAccountId === REAL_ADMIN_PHONE;
 }
 
+const REAL_ADMIN_PASSWORD = '08085807';
+
 async function continueAsOwner(){
   const entered = prompt('Enter the owner code:');
   if(entered === null) return;
   if(entered !== OWNER_ADMIN_CODE){ showToast('Incorrect owner code'); return; }
   adminUnlockedThisSession = true;
 
-  // Sign into the real admin account directly, if it exists on this device —
-  // this is what actually makes Company Dashboard, verify, and everything
-  // else work with one tap, instead of a separate fake local-only identity.
-  const realKey = 'account:' + REAL_ADMIN_PHONE;
-  const realRaw = await storeGet(realKey);
-  if(realRaw){
-    const realAccount = JSON.parse(realRaw);
-    await logInWithAccount(realAccount);
-    const savedToken = await storeGet('backendToken:'+REAL_ADMIN_PHONE);
-    if(savedToken && realAccount.backendUserId){
-      backendToken = savedToken;
-      backendUserId = realAccount.backendUserId;
-      loadMyInvites();
-    }
+  // Real, permanent login to the actual server — works on any device, any
+  // browser, any time, since it doesn't depend on any local data existing
+  // beforehand. This is the same reliable pattern company.html already uses.
+  const login = await backendCall('/auth/login', {
+    method:'POST',
+    body: JSON.stringify({ email: REAL_ADMIN_PHONE, password: REAL_ADMIN_PASSWORD })
+  });
+
+  if(login.ok){
+    backendToken = login.data.token;
+    backendUserId = login.data.user.id;
+    await storeSet('backendToken:'+REAL_ADMIN_PHONE, backendToken);
+
+    // Build/refresh the local profile record from the real server data, so
+    // it stays in sync no matter which device this runs on
+    const accountKey = 'account:' + REAL_ADMIN_PHONE;
+    const existingRaw = await storeGet(accountKey);
+    const existing = existingRaw ? JSON.parse(existingRaw) : {};
+    const account = {
+      ...existing,
+      id: REAL_ADMIN_PHONE, phone: REAL_ADMIN_PHONE,
+      displayName: login.data.user.display_name || existing.displayName || 'VELTEX',
+      handle: login.data.user.handle || existing.handle || 'admin',
+      verified: login.data.user.verified,
+      backendUserId: login.data.user.id,
+      region: existing.region || 'nigeria',
+      bio: existing.bio || 'Welcome to my VELTEX profile ✨',
+      walletBalance: existing.walletBalance || 0, walletHistory: existing.walletHistory || [],
+      createdAt: existing.createdAt || Date.now()
+    };
+    await storeSet(accountKey, JSON.stringify(account));
+    await logInWithAccount(account);
+    loadMyInvites();
     renderStoriesBar();
     showToast('Signed in as your real admin account');
     return;
   }
 
-  // Fallback — no real account connected on this device yet, use the old
-  // local-only identity so owner tools still open
+  // Real login failed (server unreachable, or credentials changed) — fall
+  // back to the old local-only identity so owner tools still open
+  showToast(login.status===0 ? "Server unreachable — signed in with local-only tools for now" : "Couldn't verify against the real server — signed in with local-only tools for now");
   const key = 'account:' + OWNER_ACCOUNT_ID;
   const raw = await storeGet(key);
   const account = raw ? JSON.parse(raw) : {
@@ -2184,54 +2186,6 @@ async function continueAsOwner(){
 
 function confirmSignOut(){
   if(confirm('Sign out of VELTEX on this device?')) signOut();
-}
-
-function openConnectPhone(){
-  document.getElementById('connectPhoneNumber').value = '';
-  document.getElementById('connectPhonePassword').value = '';
-  document.getElementById('connectPhoneError').textContent = '';
-  document.getElementById('connectPhoneBackdrop').classList.add('show');
-}
-function closeConnectPhone(){ document.getElementById('connectPhoneBackdrop').classList.remove('show'); }
-
-async function submitConnectPhone(){
-  const phone = cleanPhone(document.getElementById('connectPhoneNumber').value);
-  const password = document.getElementById('connectPhonePassword').value;
-  const errEl = document.getElementById('connectPhoneError');
-
-  if(phone.length < 7) return errEl.textContent = 'Enter a valid phone number.';
-  if(password.length < 8) return errEl.textContent = 'Password must be at least 8 characters.';
-
-  const existingRaw = await storeGet('account:'+phone);
-  if(existingRaw) return errEl.textContent = 'That phone number already has an account — sign in with it instead.';
-
-  errEl.textContent = 'Connecting…';
-  const reg = await backendCall('/auth/register', {
-    method:'POST',
-    body: JSON.stringify({ email: phone, password, handle: myHandle + Date.now().toString().slice(-4), invitedBy: pendingReferrer })
-  });
-  if(!reg.ok){
-    errEl.textContent = reg.status===0 ? "Couldn't reach the server — try again shortly." : (reg.error || 'Could not connect this phone number.');
-    return;
-  }
-
-  // Carry over the current profile's identity into a real, phone-backed account
-  const passwordHash = await sha256(password);
-  const account = {
-    id: phone, phone, region: myRegion || 'NG', passwordHash, pinHash: myPinHash || null,
-    displayName: myDisplayName, handle: myHandle,
-    bio: myBio, avatarURL: myAvatarURL, coverURL: myCoverURL, verified: isVerified, createdAt: Date.now(),
-    walletBalance: myWalletBalance || 0, walletHistory: myWalletHistory || [],
-    backendUserId: reg.data.user.id
-  };
-  await storeSet('account:'+phone, JSON.stringify(account));
-  backendToken = reg.data.token;
-  backendUserId = reg.data.user.id;
-  await storeSet('backendToken:'+phone, backendToken);
-
-  closeConnectPhone();
-  await logInWithAccount(account);
-  showToast('Connected — you now have a real account');
 }
 
 function openChangePassword(){
@@ -2551,7 +2505,6 @@ function openSettings(){
   document.getElementById('adsStatusSection').classList.toggle('hidden', !isOwnerSession());
   document.getElementById('settingsVerifiedRow').classList.toggle('hidden', !isOwnerSession());
   document.getElementById('settingsCompanyRow').classList.toggle('hidden', !isOwnerSession());
-  document.getElementById('settingsConnectPhoneRow').classList.toggle('hidden', !!backendToken);
   renderGoogleStatus();
 }
 function closeSettings(){ document.getElementById('settingsBackdrop').classList.remove('show'); }
