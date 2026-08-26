@@ -731,6 +731,11 @@
     display:inline-block; margin-top:3px; font-size:10.5px; font-weight:700; color:var(--cyan);
     background:rgba(37,244,238,.12); padding:2px 8px; border-radius:8px;
   }
+  .inbox-badge{
+    position:absolute; top:-2px; right:-2px; background:var(--pink); color:#fff; font-size:10px; font-weight:800;
+    min-width:16px; height:16px; border-radius:8px; display:flex; align-items:center; justify-content:center;
+    padding:0 3px; border:1.5px solid #000;
+  }
   .chat-fullscreen{
     position:absolute; inset:0; z-index:65; background:#000; display:flex; flex-direction:column;
   }
@@ -952,8 +957,9 @@
       <button class="icon-btn" title="Search" onclick="openTopSearch()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
       </button>
-      <button class="icon-btn" title="Inbox" onclick="showView('inbox')">
+      <button class="icon-btn" title="Inbox" onclick="showView('inbox')" style="position:relative;">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <span id="inboxBadge" class="inbox-badge hidden">0</span>
       </button>
     </div>
   </div>
@@ -1138,6 +1144,7 @@
   <div id="view-inbox" class="view">
     <div class="page">
       <div class="page-title">Inbox</div>
+      <div id="notificationsList"></div>
       <div id="inboxList"></div>
     </div>
   </div>
@@ -1944,6 +1951,7 @@ async function logInWithAccount(account){
   await loadMyPosts();
   loadMyFollowing().then(()=>loadSharedFeed()); // fire-and-forget — free server may be waking up, feed shows local posts immediately either way
   loadMyInvites();
+  loadUnreadBadge();
 
   document.getElementById('bio').textContent = myBio;
   await storeSet('session', JSON.stringify({ id: currentAccountId }));
@@ -2108,6 +2116,13 @@ async function toggleUserBanned(id){
   const account = JSON.parse(raw);
   account.banned = !account.banned;
   await storeSet(key, JSON.stringify(account));
+
+  if(account.backendUserId && backendToken){
+    const res = await backendCall('/admin/users/'+account.backendUserId+'/ban', { method:'POST' });
+    if(!res.ok) showToast('Updated locally, but could not update the real server');
+  } else if(!account.backendUserId){
+    showToast('Updated locally — this account has no real phone number connected, so there\'s no real server record to ban');
+  }
   renderVerifyList();
 }
 
@@ -2453,6 +2468,51 @@ async function sendOfficialMessage(accountId, text){
     myInboxMessages = account.inboxMessages;
     renderInbox();
   }
+}
+
+async function loadUnreadBadge(){
+  const badge = document.getElementById('inboxBadge');
+  if(!badge || !backendToken) return;
+  const res = await backendCall('/notifications/unread-count');
+  if(!res.ok) return;
+  const count = res.data.count;
+  if(count > 0){
+    badge.textContent = count > 99 ? '99+' : count;
+    badge.classList.remove('hidden');
+  } else {
+    badge.classList.add('hidden');
+  }
+}
+
+function notifText(n){
+  if(n.type==='follow') return `<b>@${escapeHTML(n.actor_handle)}</b> started following you`;
+  if(n.type==='like') return `<b>@${escapeHTML(n.actor_handle)}</b> liked your post`;
+  if(n.type==='comment') return `<b>@${escapeHTML(n.actor_handle)}</b> commented on your post`;
+  return 'New notification';
+}
+function notifIcon(type){
+  if(type==='follow') return '👤';
+  if(type==='like') return '❤️';
+  if(type==='comment') return '💬';
+  return '🔔';
+}
+
+async function loadNotifications(){
+  const el = document.getElementById('notificationsList');
+  if(!el || !backendToken) return;
+  const res = await backendCall('/notifications');
+  if(!res.ok || !res.data.length) return;
+  el.innerHTML = res.data.map(n=>`
+    <div class="inbox-msg" style="${n.read?'':'background:rgba(254,44,85,.06);'}">
+      <div class="inbox-msg-icon">${notifIcon(n.type)}</div>
+      <div>
+        <div class="inbox-msg-text">${notifText(n)}</div>
+        <div class="inbox-msg-time">${new Date(n.created_at).toLocaleString()}</div>
+      </div>
+    </div>
+  `).join('');
+  await backendCall('/notifications/mark-read', { method:'POST' });
+  loadUnreadBadge();
 }
 
 function renderInbox(){
@@ -2917,7 +2977,7 @@ function showView(name){
   if(name==='friends'){ renderFriendSearch(); renderStoriesBar(); requestAdSenseAd(); requestAdsterraAd(); }
   if(name==='profile') renderProfile();
   if(name==='live') renderJoinSeats();
-  if(name==='inbox') renderInbox();
+  if(name==='inbox'){ renderInbox(); loadNotifications(); }
   if(name==='market') loadMarketListings();
 }
 
@@ -5445,6 +5505,12 @@ async function loadMyGiftCount(){
   if(panelCount) panelCount.textContent = count;
 }
 
+async function loadMyTotalLikes(){
+  if(!backendToken) return;
+  const res = await backendCall('/users/me/total-likes');
+  if(res.ok) document.getElementById('statLikes').textContent = fmt(res.data.total);
+}
+
 async function loadMyRank(){
   if(!backendToken || !myHandle) return;
   const res = await backendCall('/users/'+encodeURIComponent(myHandle)+'/profile');
@@ -5497,6 +5563,7 @@ function renderProfile(){
   const reposted = posts.filter(p=>p.reposted);
   myTotalLikes = mine.reduce((s,p)=>s+p.likes,0);
   document.getElementById('statLikes').textContent = fmt(myTotalLikes);
+  loadMyTotalLikes();
   document.getElementById('statFollowing').textContent = followingCount;
 
   const grid = document.getElementById('profileVideos');
