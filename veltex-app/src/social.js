@@ -28,24 +28,41 @@ router.get('/users/:handle/profile', safe(async (req, res) => {
   res.json(r.rows[0]);
 }));
 
+router.get('/users/me/following-list', requireAuth, safe(async (req, res) => {
+  const r = await pool.query(
+    `SELECT u.id, u.handle, u.display_name, u.verified FROM follows f JOIN users u ON u.id = f.followee_id WHERE f.follower_id = $1 ORDER BY u.handle ASC`,
+    [req.user.sub]
+  );
+  res.json(r.rows);
+}));
+
+router.get('/users/me/followers-list', requireAuth, safe(async (req, res) => {
+  const r = await pool.query(
+    `SELECT u.id, u.handle, u.display_name, u.verified FROM follows f JOIN users u ON u.id = f.follower_id WHERE f.followee_id = $1 ORDER BY u.handle ASC`,
+    [req.user.sub]
+  );
+  res.json(r.rows);
+}));
+
 router.get('/users/me/live-eligibility', requireAuth, safe(async (req, res) => {
   const u = await pool.query(`SELECT verified FROM users WHERE id = $1`, [req.user.sub]);
   const followers = await pool.query(`SELECT COUNT(*) FROM follows WHERE followee_id = $1`, [req.user.sub]);
-  const likes = await pool.query(
-    `SELECT COUNT(*) FROM likes l JOIN feed_posts p ON p.id::text = l.video_id::text WHERE p.user_id = $1`,
-    [req.user.sub]
-  );
   const followerCount = parseInt(followers.rows[0].count, 10);
-  const likeCount = parseInt(likes.rows[0].count, 10);
   const verified = u.rows[0]?.verified || false;
   const REQUIRED_FOLLOWERS = 50;
-  const REQUIRED_LIKES = 100;
-  const eligible = verified || (followerCount >= REQUIRED_FOLLOWERS && likeCount >= REQUIRED_LIKES);
-  res.json({ eligible, followerCount, likeCount, verified, requiredFollowers: REQUIRED_FOLLOWERS, requiredLikes: REQUIRED_LIKES });
+  const eligible = verified || followerCount >= REQUIRED_FOLLOWERS;
+  res.json({ eligible, followerCount, verified, requiredFollowers: REQUIRED_FOLLOWERS });
 }));
 
 router.post('/videos/:id/like', requireAuth, safe(async (req, res) => {
   await pool.query(`INSERT INTO likes (user_id, video_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [req.user.sub, req.params.id]);
+  const post = await pool.query(`SELECT user_id FROM feed_posts WHERE id = $1`, [req.params.id]);
+  if (post.rows.length && post.rows[0].user_id !== req.user.sub) {
+    await pool.query(
+      `INSERT INTO notifications (user_id, type, actor_handle, actor_display_name) VALUES ($1, 'like', $2, $2)`,
+      [post.rows[0].user_id, req.user.handle]
+    );
+  }
   res.status(204).end();
 }));
 
@@ -58,6 +75,13 @@ router.post('/videos/:id/comments', requireAuth, safe(async (req, res) => {
   const { text } = req.body;
   if (!text || !text.trim()) return res.status(400).json({ error: 'Comment text required' });
   const r = await pool.query(`INSERT INTO comments (video_id, user_id, text) VALUES ($1, $2, $3) RETURNING *`, [req.params.id, req.user.sub, text.trim().slice(0, 500)]);
+  const post = await pool.query(`SELECT user_id FROM feed_posts WHERE id = $1`, [req.params.id]);
+  if (post.rows.length && post.rows[0].user_id !== req.user.sub) {
+    await pool.query(
+      `INSERT INTO notifications (user_id, type, actor_handle, actor_display_name) VALUES ($1, 'comment', $2, $2)`,
+      [post.rows[0].user_id, req.user.handle]
+    );
+  }
   res.status(201).json(r.rows[0]);
 }));
 
@@ -69,6 +93,10 @@ router.get('/videos/:id/comments', safe(async (req, res) => {
 router.post('/users/:id/follow', requireAuth, safe(async (req, res) => {
   if (req.user.sub === req.params.id) return res.status(400).json({ error: "Can't follow yourself" });
   await pool.query(`INSERT INTO follows (follower_id, followee_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [req.user.sub, req.params.id]);
+  await pool.query(
+    `INSERT INTO notifications (user_id, type, actor_handle, actor_display_name) VALUES ($1, 'follow', $2, $3)`,
+    [req.params.id, req.user.handle, req.user.handle]
+  );
   res.status(204).end();
 }));
 
@@ -273,6 +301,32 @@ router.get('/marketplace/my-orders', requireAuth, safe(async (req, res) => {
     [req.user.sub]
   );
   res.json(r.rows);
+}));
+
+router.get('/notifications', requireAuth, safe(async (req, res) => {
+  const r = await pool.query(
+    `SELECT id, type, actor_handle, actor_display_name, read, created_at FROM notifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50`,
+    [req.user.sub]
+  );
+  res.json(r.rows);
+}));
+
+router.get('/notifications/unread-count', requireAuth, safe(async (req, res) => {
+  const r = await pool.query(`SELECT COUNT(*) FROM notifications WHERE user_id = $1 AND read = false`, [req.user.sub]);
+  res.json({ count: parseInt(r.rows[0].count, 10) });
+}));
+
+router.post('/notifications/mark-read', requireAuth, safe(async (req, res) => {
+  await pool.query(`UPDATE notifications SET read = true WHERE user_id = $1`, [req.user.sub]);
+  res.status(204).end();
+}));
+
+router.get('/users/me/total-likes', requireAuth, safe(async (req, res) => {
+  const r = await pool.query(
+    `SELECT COUNT(*) FROM likes l JOIN feed_posts p ON p.id::text = l.video_id::text WHERE p.user_id = $1`,
+    [req.user.sub]
+  );
+  res.json({ total: parseInt(r.rows[0].count, 10) });
 }));
 
 module.exports = router;
