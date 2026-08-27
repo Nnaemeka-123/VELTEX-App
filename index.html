@@ -1212,8 +1212,8 @@
         <div id="myRankTag" class="verify-rank-tag hidden" style="margin-top:4px;"></div>
         <div class="account-id-row" onclick="copyAccountId()">ID: <span id="accountIdText">—</span> <span style="opacity:.7;">⧉</span></div>
         <div class="profile-stats">
-          <div><b id="statFollowing">0</b><span>Following</span></div>
-          <div><b id="statFollowers">0</b><span>Followers</span></div>
+          <div onclick="openFollowList('following')" style="cursor:pointer;"><b id="statFollowing">0</b><span>Following</span></div>
+          <div onclick="openFollowList('followers')" style="cursor:pointer;"><b id="statFollowers">0</b><span>Followers</span></div>
           <div><b id="statLikes">0</b><span>Likes</span></div>
         </div>
         <div class="profile-bio" id="bio" contenteditable="true" data-placeholder="Tap to add a bio" onblur="persistCurrentAccount()">Welcome to my VELTEX profile ✨</div>
@@ -1494,6 +1494,14 @@
       <div></div>
     </div>
     <div id="cameraRecordTimer" class="camera-record-timer hidden">0:00</div>
+  </div>
+
+  <!-- FOLLOW LIST -->
+  <div class="modal-backdrop" id="followListBackdrop">
+    <div class="modal">
+      <div class="modal-head"><h3 id="followListTitle">Following</h3><button class="icon-btn" onclick="closeFollowList()"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>
+      <div class="modal-body" id="followListBody"></div>
+    </div>
   </div>
 
   <!-- CHANGE PASSWORD -->
@@ -3550,8 +3558,6 @@ function toggleFollow(id){
   const p = posts.find(x=>x.id===id);
   if(p.mine){ showToast("That's you — you can't follow your own account"); return; }
   p.following = !p.following;
-  followingCount += p.following ? 1 : -1;
-  document.getElementById('statFollowing').textContent = followingCount;
   renderFeed_soft();
   showToast(p.following ? `You're now following @${p.user}` : `Unfollowed @${p.user}`);
 }
@@ -4619,10 +4625,10 @@ async function checkLiveEligibility(){
     showLiveError(res.status===0 ? "Couldn't reach the server — try again in a minute." : "Couldn't check your eligibility right now.");
     return false;
   }
-  const { eligible, followerCount, likeCount, verified, requiredFollowers, requiredLikes } = res.data;
+  const { eligible, followerCount, verified, requiredFollowers } = res.data;
   if(eligible) return true;
   if(verified) return true;
-  showLiveError(`You need ${requiredFollowers} followers and ${requiredLikes} likes to go live (or be verified). You currently have ${followerCount} followers and ${likeCount} likes.`);
+  showLiveError(`You need ${requiredFollowers} followers to go live (or be verified). You currently have ${followerCount} followers.`);
   return false;
 }
 
@@ -5710,6 +5716,33 @@ async function loadMyTotalLikes(){
   if(res.ok) document.getElementById('statLikes').textContent = fmt(res.data.total);
 }
 
+async function openFollowList(type){
+  if(!backendToken){ showToast('Sign in with your real account to see this'); return; }
+  document.getElementById('followListTitle').textContent = type==='following' ? 'Following' : 'Followers';
+  const body = document.getElementById('followListBody');
+  body.innerHTML = `<div class="empty-state"><p>Loading…</p></div>`;
+  document.getElementById('followListBackdrop').classList.add('show');
+  const res = await backendCall('/users/me/'+(type==='following'?'following-list':'followers-list'));
+  if(!res.ok){
+    body.innerHTML = `<div class="empty-state"><p>${res.status===0 ? "Couldn't reach the server — try again shortly." : "Couldn't load this list."}</p></div>`;
+    return;
+  }
+  if(!res.data.length){
+    body.innerHTML = `<div class="empty-state"><p>${type==='following' ? "You're not following anyone yet." : "No followers yet."}</p></div>`;
+    return;
+  }
+  body.innerHTML = res.data.map(u=>`
+    <div class="search-result-row" onclick="closeFollowList(); openUserProfile('${escapeHTML(u.handle)}')" style="cursor:pointer;">
+      <div class="search-result-avatar">${(u.display_name||'V')[0].toUpperCase()}</div>
+      <div class="search-result-info">
+        <div class="search-result-name">${escapeHTML(u.display_name||'VELTEX')}${u.verified?' '+ICO.verified:''}</div>
+        <div class="search-result-handle">@${escapeHTML(u.handle)}</div>
+      </div>
+    </div>
+  `).join('');
+}
+function closeFollowList(){ document.getElementById('followListBackdrop').classList.remove('show'); }
+
 async function loadMyRank(){
   if(!backendToken || !myHandle) return;
   const res = await backendCall('/users/'+encodeURIComponent(myHandle)+'/profile');
@@ -5763,7 +5796,6 @@ function renderProfile(){
   myTotalLikes = mine.reduce((s,p)=>s+p.likes,0);
   document.getElementById('statLikes').textContent = fmt(myTotalLikes);
   loadMyTotalLikes();
-  document.getElementById('statFollowing').textContent = followingCount;
 
   const grid = document.getElementById('profileVideos');
   const emptyWrap = document.getElementById('profileEmpty');
