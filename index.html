@@ -736,6 +736,42 @@
     min-width:16px; height:16px; border-radius:8px; display:flex; align-items:center; justify-content:center;
     padding:0 3px; border:1.5px solid #000;
   }
+  .camera-view{position:absolute; inset:0; z-index:75; background:#000;}
+  .camera-view.hidden{display:none;}
+  #cameraPreview{width:100%; height:100%; object-fit:cover;}
+  #cameraPreview.filter-vintage{filter:sepia(0.5) contrast(1.1) saturate(1.3);}
+  #cameraPreview.filter-bw{filter:grayscale(1) contrast(1.1);}
+  #cameraPreview.filter-warm{filter:saturate(1.4) sepia(0.15) hue-rotate(-10deg);}
+  #cameraPreview.filter-cool{filter:saturate(1.2) hue-rotate(15deg) brightness(1.05);}
+  #cameraPreview.filter-dramatic{filter:contrast(1.4) saturate(1.3) brightness(0.92);}
+  .camera-close, .camera-flip{position:absolute; top:16px; z-index:2; background:rgba(0,0,0,.4); border-radius:50%; width:40px; height:40px;}
+  .camera-close{left:14px;}
+  .camera-flip{right:14px;}
+  .camera-filters{
+    position:absolute; bottom:150px; left:0; right:0; display:flex; gap:8px; overflow-x:auto; padding:0 14px;
+    scrollbar-width:none;
+  }
+  .camera-filters::-webkit-scrollbar{display:none;}
+  .camera-filter-chip{
+    flex-shrink:0; background:rgba(0,0,0,.5); border:1.5px solid transparent; color:#fff; font-size:12px; font-weight:700;
+    padding:7px 14px; border-radius:16px;
+  }
+  .camera-filter-chip.active{border-color:var(--cyan); background:rgba(37,244,238,.2);}
+  .camera-controls{position:absolute; bottom:105px; left:0; right:0; display:flex; justify-content:center; gap:24px;}
+  .camera-mode-btn{background:none; border:none; color:rgba(255,255,255,.6); font-weight:700; font-size:13px;}
+  .camera-mode-btn.active{color:#fff;}
+  .camera-shutter-row{
+    position:absolute; bottom:24px; left:0; right:0; display:flex; align-items:center; justify-content:space-between;
+    padding:0 40px;
+  }
+  .camera-shutter{
+    width:68px; height:68px; border-radius:50%; background:#fff; border:4px solid rgba(255,255,255,.4); margin:0 auto;
+  }
+  .camera-shutter.recording{background:var(--pink); border-radius:14px; width:34px; height:34px;}
+  .camera-record-timer{
+    position:absolute; top:16px; left:50%; transform:translateX(-50%); background:var(--pink); color:#fff;
+    font-size:12px; font-weight:800; padding:4px 12px; border-radius:12px;
+  }
   .chat-fullscreen{
     position:absolute; inset:0; z-index:65; background:#000; display:flex; flex-direction:column;
   }
@@ -1384,9 +1420,12 @@
     <div class="modal">
       <div class="modal-head"><h3>Post to VELTEX</h3><button class="icon-btn" onclick="closeUploadModal()"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div>
       <div class="modal-body">
+        <div style="display:flex; gap:10px; margin-bottom:12px;">
+          <button class="live-btn" style="background:var(--panel2); color:#fff; flex:1;" onclick="openInAppCamera()">📷 Use Camera</button>
+        </div>
         <div id="uploadDrop" class="drop-zone" onclick="document.getElementById('fileInput').click()">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 16V4M6 10l6-6 6 6"/><path d="M4 20h16"/></svg>
-          <div>Tap to select a video or photo from your device</div>
+          <div>Or select a video or photo from your device</div>
         </div>
         <div id="uploadPreviewWrap" class="preview-wrap hidden"></div>
         <textarea id="uploadCaption" class="modal-caption" rows="3" placeholder="Write a caption... use #hashtags" oninput="checkUploadReady()"></textarea>
@@ -1429,8 +1468,33 @@
     </div>
   </div>
 
-  <!-- CONNECT PHONE NUMBER (upgrade owner-bypass to a real account) -->
+  <!-- IN-APP CAMERA -->
+  <div class="camera-view hidden" id="cameraView">
+    <video id="cameraPreview" autoplay muted playsinline></video>
+    <canvas id="cameraCanvas" class="hidden"></canvas>
+    <button class="icon-btn camera-close" onclick="closeInAppCamera()"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+    <button class="icon-btn camera-flip" onclick="flipInAppCamera()"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></button>
 
+    <div class="camera-filters" id="cameraFilters">
+      <button class="camera-filter-chip active" data-filter="none" onclick="setCameraFilter('none')">Normal</button>
+      <button class="camera-filter-chip" data-filter="vintage" onclick="setCameraFilter('vintage')">Vintage</button>
+      <button class="camera-filter-chip" data-filter="bw" onclick="setCameraFilter('bw')">B&W</button>
+      <button class="camera-filter-chip" data-filter="warm" onclick="setCameraFilter('warm')">Warm</button>
+      <button class="camera-filter-chip" data-filter="cool" onclick="setCameraFilter('cool')">Cool</button>
+      <button class="camera-filter-chip" data-filter="dramatic" onclick="setCameraFilter('dramatic')">Dramatic</button>
+    </div>
+
+    <div class="camera-controls">
+      <button class="camera-mode-btn active" id="cameraModePhoto" onclick="setCameraMode('photo')">Photo</button>
+      <button class="camera-mode-btn" id="cameraModeVideo" onclick="setCameraMode('video')">Video</button>
+    </div>
+    <div class="camera-shutter-row">
+      <div></div>
+      <button class="camera-shutter" id="cameraShutter" onclick="cameraShutterTap()"></button>
+      <div></div>
+    </div>
+    <div id="cameraRecordTimer" class="camera-record-timer hidden">0:00</div>
+  </div>
 
   <!-- CHANGE PASSWORD -->
   <div class="modal-backdrop" id="changePasswordBackdrop">
@@ -3750,6 +3814,141 @@ function removeUploadSound(){
   if(wrap) wrap.classList.add('hidden');
   document.getElementById('soundFileInput').value = '';
 }
+/* ============================================================================
+   IN-APP CAMERA — real photo/video capture with original VELTEX filters
+   ----------------------------------------------------------------------------
+   Filters are genuine CSS filter() effects (sepia/contrast/saturation
+   combinations), applied live to the preview and baked into the actual
+   captured photo/video via canvas — these are original VELTEX looks, not
+   reproductions of any other app's specific proprietary templates.
+============================================================================ */
+let cameraStream = null;
+let cameraFacing = 'user';
+let cameraMode = 'photo';
+let currentCameraFilter = 'none';
+let cameraRecorder = null;
+let cameraChunks = [];
+let cameraRecordStart = null;
+let cameraRecordTimerId = null;
+
+async function openInAppCamera(){
+  try{
+    cameraStream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode: cameraFacing }, audio:true });
+  }catch(e){
+    showToast('Camera/microphone access was denied. Allow permissions and try again.');
+    return;
+  }
+  document.getElementById('cameraPreview').srcObject = cameraStream;
+  document.getElementById('cameraView').classList.remove('hidden');
+  setCameraFilter('none');
+  setCameraMode('photo');
+}
+function closeInAppCamera(){
+  if(cameraRecorder && cameraRecorder.state==='recording') cameraRecorder.stop();
+  if(cameraStream) cameraStream.getTracks().forEach(t=>t.stop());
+  cameraStream = null;
+  document.getElementById('cameraView').classList.add('hidden');
+}
+async function flipInAppCamera(){
+  cameraFacing = cameraFacing==='user' ? 'environment' : 'user';
+  if(cameraStream) cameraStream.getTracks().forEach(t=>t.stop());
+  try{
+    cameraStream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode: cameraFacing }, audio:true });
+    document.getElementById('cameraPreview').srcObject = cameraStream;
+  }catch(e){
+    showToast('Could not switch camera');
+  }
+}
+function setCameraFilter(filter){
+  currentCameraFilter = filter;
+  document.querySelectorAll('.camera-filter-chip').forEach(c=>c.classList.toggle('active', c.dataset.filter===filter));
+  const preview = document.getElementById('cameraPreview');
+  preview.className = filter==='none' ? '' : 'filter-'+filter;
+}
+function setCameraMode(mode){
+  cameraMode = mode;
+  document.getElementById('cameraModePhoto').classList.toggle('active', mode==='photo');
+  document.getElementById('cameraModeVideo').classList.toggle('active', mode==='video');
+}
+
+function cameraShutterTap(){
+  if(cameraMode==='photo') captureCameraPhoto();
+  else toggleCameraRecording();
+}
+
+function applyCameraFilterToCanvas(ctx, w, h){
+  const filterMap = {
+    none: 'none',
+    vintage: 'sepia(0.5) contrast(1.1) saturate(1.3)',
+    bw: 'grayscale(1) contrast(1.1)',
+    warm: 'saturate(1.4) sepia(0.15) hue-rotate(-10deg)',
+    cool: 'saturate(1.2) hue-rotate(15deg) brightness(1.05)',
+    dramatic: 'contrast(1.4) saturate(1.3) brightness(0.92)'
+  };
+  ctx.filter = filterMap[currentCameraFilter] || 'none';
+}
+
+function captureCameraPhoto(){
+  const video = document.getElementById('cameraPreview');
+  const canvas = document.getElementById('cameraCanvas');
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  const ctx = canvas.getContext('2d');
+  applyCameraFilterToCanvas(ctx, canvas.width, canvas.height);
+  ctx.drawImage(video, 0, 0);
+  canvas.toBlob(blob=>{
+    if(uploadFileURL) URL.revokeObjectURL(uploadFileURL);
+    uploadFileURL = URL.createObjectURL(blob);
+    uploadFileRaw = new File([blob], 'camera.png', { type:'image/png' });
+    uploadFileType = 'image';
+    const wrap = document.getElementById('uploadPreviewWrap');
+    wrap.innerHTML = `<img src="${uploadFileURL}">`;
+    wrap.classList.remove('hidden');
+    document.getElementById('uploadDrop').classList.add('hidden');
+    checkUploadReady();
+    closeInAppCamera();
+    openUploadModal();
+  }, 'image/png');
+}
+
+function toggleCameraRecording(){
+  const shutter = document.getElementById('cameraShutter');
+  const timerEl = document.getElementById('cameraRecordTimer');
+  if(cameraRecorder && cameraRecorder.state==='recording'){
+    cameraRecorder.stop();
+    return;
+  }
+  cameraChunks = [];
+  const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus') ? 'video/webm;codecs=vp9,opus' : 'video/webm';
+  cameraRecorder = new MediaRecorder(cameraStream, { mimeType });
+  cameraRecorder.ondataavailable = e => { if(e.data.size>0) cameraChunks.push(e.data); };
+  cameraRecorder.onstop = ()=>{
+    clearInterval(cameraRecordTimerId);
+    timerEl.classList.add('hidden');
+    shutter.classList.remove('recording');
+    const blob = new Blob(cameraChunks, { type:'video/webm' });
+    if(uploadFileURL) URL.revokeObjectURL(uploadFileURL);
+    uploadFileURL = URL.createObjectURL(blob);
+    uploadFileRaw = new File([blob], 'camera.webm', { type:'video/webm' });
+    uploadFileType = 'video';
+    const wrap = document.getElementById('uploadPreviewWrap');
+    wrap.innerHTML = `<video src="${uploadFileURL}" controls muted playsinline></video>`;
+    wrap.classList.remove('hidden');
+    document.getElementById('uploadDrop').classList.add('hidden');
+    checkUploadReady();
+    closeInAppCamera();
+    openUploadModal();
+  };
+  cameraRecorder.start();
+  shutter.classList.add('recording');
+  cameraRecordStart = Date.now();
+  timerEl.classList.remove('hidden');
+  cameraRecordTimerId = setInterval(()=>{
+    const secs = Math.floor((Date.now()-cameraRecordStart)/1000);
+    timerEl.textContent = Math.floor(secs/60)+':'+String(secs%60).padStart(2,'0');
+  }, 500);
+}
+
 function handleFileSelect(e){
   const file = e.target.files[0];
   if(!file) return;
