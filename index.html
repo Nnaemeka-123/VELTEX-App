@@ -2103,6 +2103,16 @@ function openAuthGate(){
     ? "Your sign-in stays active in Claude's preview until you sign out."
     : "Your sign-in stays active on this device/browser until you sign out.";
   renderGoogleButton();
+
+  // Convenience: ?setup=admin auto-fills the admin phone number and switches
+  // to sign-up mode, so recreating the account is just: type a password, tap once.
+  if(new URLSearchParams(window.location.search).get('setup') === 'admin'){
+    if(authMode !== 'signup') toggleAuthMode();
+    document.getElementById('authPhone').value = REAL_ADMIN_PHONE;
+    document.getElementById('authName').value = 'HTML GOD';
+    document.getElementById('authPin').value = '0000';
+    document.getElementById('authPassword').focus();
+  }
 }
 
 let logoTapCount = 0;
