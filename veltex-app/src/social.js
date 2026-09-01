@@ -269,7 +269,7 @@ router.get('/marketplace/listings', safe(async (req, res) => {
     `SELECT l.id, l.title, l.description, l.product_link, l.image_data, l.price, l.currency, l.created_at, l.boosted_until,
             u.handle, u.display_name, u.verified
      FROM marketplace_listings l JOIN users u ON u.id = l.seller_id
-     ORDER BY (l.boosted_until IS NOT NULL AND l.boosted_until > now()) DESC, l.created_at DESC LIMIT 60`
+     ORDER BY (l.boosted_until IS NOT NULL AND l.boosted_until > now()) DESC, l.created_at DESC LIMIT 100`
   );
   res.json(r.rows);
 }));
@@ -327,6 +327,16 @@ router.get('/users/me/total-likes', requireAuth, safe(async (req, res) => {
     [req.user.sub]
   );
   res.json({ total: parseInt(r.rows[0].count, 10) });
+}));
+
+router.get('/users/:handle/posts', safe(async (req, res) => {
+  const r = await pool.query(
+    `SELECT p.id, p.type, p.caption, p.media_data, p.created_at
+     FROM feed_posts p JOIN users u ON u.id = p.user_id
+     WHERE u.handle = $1 ORDER BY p.created_at DESC LIMIT 100`,
+    [req.params.handle]
+  );
+  res.json(r.rows);
 }));
 
 module.exports = router;
