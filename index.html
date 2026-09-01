@@ -4081,6 +4081,7 @@ async function toggleRealFollowChip(authorId, postId){
   const res = await backendCall('/users/'+authorId+'/follow', { method: isFollowing ? 'DELETE' : 'POST' });
   if(!res.ok){ showToast(res.status===0 ? 'Server unreachable — try again shortly' : 'Could not update follow status'); return; }
   if(p) p.following = !isFollowing;
+  posts.forEach(x=>{ if(x.authorId===authorId) x.following = !isFollowing; });
   if(isFollowing) myFollowingIds.delete(authorId); else myFollowingIds.add(authorId);
   const chip = document.getElementById('followchip-'+authorId);
   if(chip){ chip.classList.toggle('following', !isFollowing); chip.textContent = isFollowing ? 'Follow' : 'Following'; }
@@ -4198,6 +4199,7 @@ async function toggleRealFollow2(authorId){
   const res = await backendCall('/users/'+authorId+'/follow', { method: isFollowing ? 'DELETE' : 'POST' });
   if(!res.ok){ showToast(res.status===0 ? 'Server unreachable — try again shortly' : 'Could not update follow status'); return; }
   if(isFollowing) myFollowingIds.delete(authorId); else myFollowingIds.add(authorId);
+  posts.forEach(x=>{ if(x.authorId===authorId) x.following = !isFollowing; });
   btn.classList.toggle('following', !isFollowing);
   btn.textContent = isFollowing ? 'Follow' : 'Following';
 }
@@ -4450,6 +4452,7 @@ async function toggleRealFollow(targetUserId){
     return;
   }
   if(isFollowing) myFollowingIds.delete(targetUserId); else myFollowingIds.add(targetUserId);
+  posts.forEach(x=>{ if(x.authorId===targetUserId) x.following = !isFollowing; });
   if(btn){
     btn.classList.toggle('following', !isFollowing);
     btn.textContent = isFollowing ? 'Follow' : 'Following';
