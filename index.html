@@ -744,6 +744,8 @@
   #cameraPreview.filter-warm{filter:saturate(1.4) sepia(0.15) hue-rotate(-10deg);}
   #cameraPreview.filter-cool{filter:saturate(1.2) hue-rotate(15deg) brightness(1.05);}
   #cameraPreview.filter-dramatic{filter:contrast(1.4) saturate(1.3) brightness(0.92);}
+  #cameraPreview.filter-clean{filter:contrast(1.08) saturate(1.1) brightness(1.03);}
+  #cameraPreview.filter-vivid{filter:contrast(1.15) saturate(1.35) brightness(1.02);}
   .camera-close, .camera-flip{position:absolute; top:16px; z-index:2; background:rgba(0,0,0,.4); border-radius:50%; width:40px; height:40px;}
   .camera-close{left:14px;}
   .camera-flip{right:14px;}
@@ -1477,6 +1479,8 @@
 
     <div class="camera-filters" id="cameraFilters">
       <button class="camera-filter-chip active" data-filter="none" onclick="setCameraFilter('none')">Normal</button>
+      <button class="camera-filter-chip" data-filter="clean" onclick="setCameraFilter('clean')">Clean</button>
+      <button class="camera-filter-chip" data-filter="vivid" onclick="setCameraFilter('vivid')">Vivid</button>
       <button class="camera-filter-chip" data-filter="vintage" onclick="setCameraFilter('vintage')">Vintage</button>
       <button class="camera-filter-chip" data-filter="bw" onclick="setCameraFilter('bw')">B&W</button>
       <button class="camera-filter-chip" data-filter="warm" onclick="setCameraFilter('warm')">Warm</button>
@@ -3895,6 +3899,8 @@ function cameraShutterTap(){
 function applyCameraFilterToCanvas(ctx, w, h){
   const filterMap = {
     none: 'none',
+    clean: 'contrast(1.08) saturate(1.1) brightness(1.03)',
+    vivid: 'contrast(1.15) saturate(1.35) brightness(1.02)',
     vintage: 'sepia(0.5) contrast(1.1) saturate(1.3)',
     bw: 'grayscale(1) contrast(1.1)',
     warm: 'saturate(1.4) sepia(0.15) hue-rotate(-10deg)',
@@ -4079,7 +4085,7 @@ async function toggleRealFollowChip(authorId, postId){
   const p = posts.find(x=>x.id===postId);
   const isFollowing = p ? p.following : false;
   const res = await backendCall('/users/'+authorId+'/follow', { method: isFollowing ? 'DELETE' : 'POST' });
-  if(!res.ok){ showToast(res.status===0 ? 'Server unreachable — try again shortly' : 'Could not update follow status'); return; }
+  if(!res.ok){ showToast(res.status===0 ? 'Server unreachable — try again shortly' : ('Could not follow: ' + (res.error || 'status '+res.status))); return; }
   if(p) p.following = !isFollowing;
   posts.forEach(x=>{ if(x.authorId===authorId) x.following = !isFollowing; });
   if(isFollowing) myFollowingIds.delete(authorId); else myFollowingIds.add(authorId);
@@ -4197,7 +4203,7 @@ async function toggleRealFollow2(authorId){
   const btn = document.getElementById('upFollowBtn');
   const isFollowing = btn.classList.contains('following');
   const res = await backendCall('/users/'+authorId+'/follow', { method: isFollowing ? 'DELETE' : 'POST' });
-  if(!res.ok){ showToast(res.status===0 ? 'Server unreachable — try again shortly' : 'Could not update follow status'); return; }
+  if(!res.ok){ showToast(res.status===0 ? 'Server unreachable — try again shortly' : ('Could not follow: ' + (res.error || 'status '+res.status))); return; }
   if(isFollowing) myFollowingIds.delete(authorId); else myFollowingIds.add(authorId);
   posts.forEach(x=>{ if(x.authorId===authorId) x.following = !isFollowing; });
   btn.classList.toggle('following', !isFollowing);
@@ -4289,7 +4295,11 @@ async function publishPost(){
   // silently losing the post from view right now.
   let tooLargeToSave = false;
   const approxBytes = (persistentSrc.length||0) + (persistentSoundURL?persistentSoundURL.length:0);
-  if(currentAccountId && approxBytes < 4.5*1024*1024){
+  // Real browser limit worth knowing: localStorage typically allows only
+  // 5-10MB TOTAL per site (shared across everything saved, not per-post),
+  // enforced by the browser itself — not something any amount of code can
+  // raise past. This threshold is set as high as is realistically safe.
+  if(currentAccountId && approxBytes < 8*1024*1024){
     const saved = await storeSet('post:'+currentAccountId+':'+newPost.id, JSON.stringify(newPost));
     if(!saved) tooLargeToSave = true;
   } else {
@@ -4448,7 +4458,7 @@ async function toggleRealFollow(targetUserId){
   const isFollowing = btn && btn.classList.contains('following');
   const res = await backendCall('/users/'+targetUserId+'/follow', { method: isFollowing ? 'DELETE' : 'POST' });
   if(!res.ok){
-    showToast(res.status===0 ? 'Server unreachable — try again shortly' : 'Could not update follow status');
+    showToast(res.status===0 ? 'Server unreachable — try again shortly' : ('Could not follow: ' + (res.error || 'status '+res.status)));
     return;
   }
   if(isFollowing) myFollowingIds.delete(targetUserId); else myFollowingIds.add(targetUserId);
