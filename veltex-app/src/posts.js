@@ -4,7 +4,7 @@ const { requireAuth } = require('../middleware/auth');
 
 const router = express.Router();
 
-const MAX_MEDIA_CHARS = 3 * 1024 * 1024;
+const MAX_MEDIA_CHARS = 8 * 1024 * 1024;
 
 function safe(fn) {
   return async (req, res) => {
